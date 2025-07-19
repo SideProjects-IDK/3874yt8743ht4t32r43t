@@ -1,0 +1,921 @@
+﻿using System;
+using System.Data;
+using System.Data.SqlClient;
+using System.Windows.Forms;
+using System.Drawing.Printing;
+using System.Drawing;
+using System.IO;
+
+namespace AgePay
+{
+    public partial class frmEmployeeProfile : Form
+    {
+        private readonly string connectionString = "Server=192.168.1.197;Database=AgePay;User Id=sa;Password=ilahia;";
+        private PrintDocument printDocument = new PrintDocument();
+        private DataTable printData;
+
+        public frmEmployeeProfile()
+        {
+            InitializeComponent();
+            SetFormFieldsEnabled(false);
+            printDocument.PrintPage += new PrintPageEventHandler(PrintDocument_PrintPage);
+        }
+
+        private void frmEmployeeProfile_Load(object sender, EventArgs e)
+        {
+        }
+
+        private void SetFormFieldsEnabled(bool enabled)
+        {
+            txtEmployeeID.Enabled = enabled;
+            txtEmployeeName.Enabled = enabled;
+            txtFatherName.Enabled = enabled;
+            txtDesignation.Enabled = enabled;
+            txtDeptID.Enabled = enabled;
+            txtDOB.Enabled = enabled;
+            txtDOA.Enabled = enabled;
+            txtCNIC.Enabled = enabled;
+            txtGSalary.Enabled = enabled;
+            txtDOR.Enabled = enabled;
+            txtDepoNo.Enabled = enabled;
+            txtDutyIn.Enabled = enabled;
+            txtDutyOut.Enabled = enabled;
+            pictureEmployee.Enabled = enabled;
+        }
+
+        private void btnNew_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Clear form fields
+                txtEmployeeID.Text = "";
+                txtEmployeeName.Text = "";
+                txtFatherName.Text = "";
+                txtDesignation.Text = "";
+                txtDeptID.Text = "";
+                txtDOB.Text = "";
+                txtDOA.Text = "";
+                txtCNIC.Text = "";
+                txtGSalary.Text = "";
+                txtDOR.Text = "";
+                txtDepoNo.Text = "";
+                txtDutyIn.Text = "";
+                txtDutyOut.Text = "";
+                pictureEmployee.Image?.Dispose();
+                pictureEmployee.Image = null;
+
+                SetFormFieldsEnabled(true);
+                txtEmployeeID.Enabled = false;
+
+                // Generate new EmployeeID
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string query = "SELECT ISNULL(MAX(EmployeeID), 0) FROM EmployeeProfile";
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        object result = command.ExecuteScalar();
+                        int newEmployeeID = result == DBNull.Value ? 1 : Convert.ToInt32(result) + 1;
+                        txtEmployeeID.Text = newEmployeeID.ToString();
+                    }
+                }
+
+                // Optional image selection with recommendation
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    ofd.Filter = "Image Files|*.jpg;*.jpeg;*.png;*.bmp";
+                    ofd.Title = "Select a New Employee Photo (Optional)";
+                    if (ofd.ShowDialog() == DialogResult.OK)
+                    {
+                        // Validate image before loading
+                        FileInfo fileInfo = new FileInfo(ofd.FileName);
+                        if (fileInfo.Length > 2 * 1024 * 1024) // 2MB limit
+                        {
+                            MessageBox.Show("Image size exceeds 2MB limit. Please select a smaller file.", "Image Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                        using (Image tempImage = Image.FromFile(ofd.FileName))
+                        {
+                            if (tempImage.Width > 2000 || tempImage.Height > 2000)
+                            {
+                                MessageBox.Show("Image dimensions exceed 2000x2000 pixels. Please resize the image.", "Image Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                return;
+                            }
+                            pictureEmployee.Image?.Dispose();
+                            pictureEmployee.Image = (Image)tempImage.Clone();
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("No image selected. It is recommended to add a photo for better identification.\nRecommended: Max size 2MB, Max dimensions 2000x2000 pixels.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (SqlException ex)
+            {
+                MessageBox.Show($"Database error: {ex.Message}\nEnsure SQL Server is running at 192.168.243.151 and credentials are correct.", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                MessageBox.Show($"Access denied: {ex.Message}\nCheck file permissions or run the application as administrator.\nRecommended image: Max size 2MB, Max dimensions 2000x2000 pixels.", "File Access Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (OutOfMemoryException ex)
+            {
+                MessageBox.Show($"Memory error: {ex.Message}\nThe selected image (6KB) caused an unexpected memory issue. Try a different file or restart the application.\nRecommended: Max size 2MB, Max dimensions 2000x2000 pixels.", "Image Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An unexpected error occurred: {ex.Message}\nStack Trace: {ex.StackTrace}\nRecommended image: Max size 2MB, Max dimensions 2000x2000 pixels.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnSave_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(txtEmployeeID.Text) ||
+                    string.IsNullOrWhiteSpace(txtEmployeeName.Text) ||
+                    string.IsNullOrWhiteSpace(txtDeptID.Text))
+                {
+                    MessageBox.Show("Employee ID, Name, and Department ID are required.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (!int.TryParse(txtEmployeeID.Text, out int employeeId))
+                {
+                    MessageBox.Show("Employee ID must be a valid number.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (!int.TryParse(txtDeptID.Text, out int deptId))
+                {
+                    MessageBox.Show("Department ID must be a valid number.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                decimal? gSalary = null;
+                if (!string.IsNullOrWhiteSpace(txtGSalary.Text))
+                {
+                    if (!decimal.TryParse(txtGSalary.Text, out decimal parsedGSalary))
+                    {
+                        MessageBox.Show("Gross Salary must be a valid decimal number (e.g., 50000.00).", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    gSalary = parsedGSalary;
+                }
+
+                DateTime? dob = null;
+                if (!string.IsNullOrWhiteSpace(txtDOB.Text))
+                {
+                    if (!DateTime.TryParse(txtDOB.Text, out DateTime parsedDOB))
+                    {
+                        MessageBox.Show("Date of Birth must be a valid date (yyyy-MM-dd).", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    dob = parsedDOB;
+                }
+
+                DateTime? doa = null;
+                if (!string.IsNullOrWhiteSpace(txtDOA.Text))
+                {
+                    if (!DateTime.TryParse(txtDOA.Text, out DateTime parsedDOA))
+                    {
+                        MessageBox.Show("Date of Appointment must be a valid date (yyyy-MM-dd).", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    doa = parsedDOA;
+                }
+
+                DateTime? dor = null;
+                if (!string.IsNullOrWhiteSpace(txtDOR.Text))
+                {
+                    if (!DateTime.TryParse(txtDOR.Text, out DateTime parsedDOR))
+                    {
+                        MessageBox.Show("Date of Retirement must be a valid date (yyyy-MM-dd).", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    dor = parsedDOR;
+                }
+
+                TimeSpan? dutyIn = null;
+                if (!string.IsNullOrWhiteSpace(txtDutyIn.Text))
+                {
+                    if (!TimeSpan.TryParse(txtDutyIn.Text, out TimeSpan parsedDutyIn))
+                    {
+                        MessageBox.Show("Duty In must be a valid time (HH:mm:ss).", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    dutyIn = parsedDutyIn;
+                }
+
+                TimeSpan? dutyOut = null;
+                if (!string.IsNullOrWhiteSpace(txtDutyOut.Text))
+                {
+                    if (!TimeSpan.TryParse(txtDutyOut.Text, out TimeSpan parsedDutyOut))
+                    {
+                        MessageBox.Show("Duty Out must be a valid time (HH:mm:ss).", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    dutyOut = parsedDutyOut;
+                }
+
+                DialogResult result = MessageBox.Show("Are you sure you want to save this employee?", "Confirm Save", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result != DialogResult.Yes)
+                    return;
+
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string checkQuery = "SELECT COUNT(*) FROM EmployeeProfile WHERE EmployeeID = @EmployeeID";
+                    using (SqlCommand checkCommand = new SqlCommand(checkQuery, connection))
+                    {
+                        checkCommand.Parameters.AddWithValue("@EmployeeID", employeeId);
+                        int count = (int)checkCommand.ExecuteScalar();
+
+                        if (count == 0) // Insert new record
+                        {
+                            string insertQuery = @"
+                                INSERT INTO EmployeeProfile (
+                                    EmployeeID, EmployeeName, FatherName, Designation, DeptID, 
+                                    DOB, DOA, CNIC, GSalary, DOR, Address, DutyIn, DutyOut, UserID, PostOn, EmployeeImage
+                                )
+                                VALUES (
+                                    @EmployeeID, @EmployeeName, @FatherName, @Designation, @DeptID, 
+                                    @DOB, @DOA, @CNIC, @GSalary, @DOR, @Address, @DutyIn, @DutyOut, @UserID, @PostOn, @EmployeeImage
+                                )";
+
+                            using (SqlCommand command = new SqlCommand(insertQuery, connection))
+                            {
+                                command.Parameters.AddWithValue("@EmployeeID", employeeId);
+                                command.Parameters.AddWithValue("@EmployeeName", txtEmployeeName.Text);
+                                command.Parameters.AddWithValue("@FatherName", string.IsNullOrWhiteSpace(txtFatherName.Text) ? (object)DBNull.Value : txtFatherName.Text);
+                                command.Parameters.AddWithValue("@Designation", string.IsNullOrWhiteSpace(txtDesignation.Text) ? (object)DBNull.Value : txtDesignation.Text);
+                                command.Parameters.AddWithValue("@DeptID", deptId);
+                                command.Parameters.AddWithValue("@DOB", dob.HasValue ? (object)dob.Value.Date : DBNull.Value);
+                                command.Parameters.AddWithValue("@DOA", doa.HasValue ? (object)doa.Value.Date : DBNull.Value);
+                                command.Parameters.AddWithValue("@CNIC", string.IsNullOrWhiteSpace(txtCNIC.Text) ? (object)DBNull.Value : txtCNIC.Text);
+                                command.Parameters.AddWithValue("@GSalary", gSalary.HasValue ? (object)gSalary.Value : DBNull.Value);
+                                command.Parameters.AddWithValue("@DOR", dor.HasValue ? (object)dor.Value.Date : DBNull.Value);
+                                command.Parameters.AddWithValue("@Address", string.IsNullOrWhiteSpace(txtDepoNo.Text) ? (object)DBNull.Value : txtDepoNo.Text);
+                                command.Parameters.AddWithValue("@DutyIn", dutyIn.HasValue ? (object)dutyIn.Value.ToString("HH\\:mm\\:ss") : DBNull.Value);
+                                command.Parameters.AddWithValue("@DutyOut", dutyOut.HasValue ? (object)dutyOut.Value.ToString("HH\\:mm\\:ss") : DBNull.Value);
+                                command.Parameters.AddWithValue("@UserID", DBNull.Value);
+                                command.Parameters.AddWithValue("@PostOn", DateTime.Now);
+                                command.Parameters.AddWithValue("@EmployeeImage", pictureEmployee.Image != null ? ImageToByteArray(pictureEmployee.Image) : (object)DBNull.Value);
+
+                                command.ExecuteNonQuery();
+                            }
+                            MessageBox.Show("Employee inserted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        else // Update existing record
+                        {
+                            string updateQuery = @"
+                                UPDATE EmployeeProfile
+                                SET EmployeeName = @EmployeeName,
+                                    FatherName = @FatherName,
+                                    Designation = @Designation,
+                                    DeptID = @DeptID,
+                                    DOB = @DOB,
+                                    DOA = @DOA,
+                                    CNIC = @CNIC,
+                                    GSalary = @GSalary,
+                                    DOR = @DOR,
+                                    Address = @Address,
+                                    DutyIn = @DutyIn,
+                                    DutyOut = @DutyOut,
+                                    UserID = @UserID,
+                                    PostOn = @PostOn,
+                                    EmployeeImage = @EmployeeImage
+                                WHERE EmployeeID = @EmployeeID";
+
+                            using (SqlCommand command = new SqlCommand(updateQuery, connection))
+                            {
+                                command.Parameters.AddWithValue("@EmployeeID", employeeId);
+                                command.Parameters.AddWithValue("@EmployeeName", txtEmployeeName.Text);
+                                command.Parameters.AddWithValue("@FatherName", string.IsNullOrWhiteSpace(txtFatherName.Text) ? (object)DBNull.Value : txtFatherName.Text);
+                                command.Parameters.AddWithValue("@Designation", string.IsNullOrWhiteSpace(txtDesignation.Text) ? (object)DBNull.Value : txtDesignation.Text);
+                                command.Parameters.AddWithValue("@DeptID", deptId);
+                                command.Parameters.AddWithValue("@DOB", dob.HasValue ? (object)dob.Value.Date : DBNull.Value);
+                                command.Parameters.AddWithValue("@DOA", doa.HasValue ? (object)doa.Value.Date : DBNull.Value);
+                                command.Parameters.AddWithValue("@CNIC", string.IsNullOrWhiteSpace(txtCNIC.Text) ? (object)DBNull.Value : txtCNIC.Text);
+                                command.Parameters.AddWithValue("@GSalary", gSalary.HasValue ? (object)gSalary.Value : DBNull.Value);
+                                command.Parameters.AddWithValue("@DOR", dor.HasValue ? (object)dor.Value.Date : DBNull.Value);
+                                command.Parameters.AddWithValue("@Address", string.IsNullOrWhiteSpace(txtDepoNo.Text) ? (object)DBNull.Value : txtDepoNo.Text);
+                                command.Parameters.AddWithValue("@DutyIn", dutyIn.HasValue ? (object)dutyIn.Value.ToString("HH\\:mm\\:ss") : DBNull.Value);
+                                command.Parameters.AddWithValue("@DutyOut", dutyOut.HasValue ? (object)dutyOut.Value.ToString("HH\\:mm\\:ss") : DBNull.Value);
+                                command.Parameters.AddWithValue("@UserID", DBNull.Value);
+                                command.Parameters.AddWithValue("@PostOn", DateTime.Now);
+                                command.Parameters.AddWithValue("@EmployeeImage", pictureEmployee.Image != null ? ImageToByteArray(pictureEmployee.Image) : (object)DBNull.Value);
+
+                                command.ExecuteNonQuery();
+                            }
+                            MessageBox.Show("Employee updated successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                    }
+                }
+
+                SetFormFieldsEnabled(false);
+            }
+            catch (SqlException ex)
+            {
+                MessageBox.Show($"Database error: {ex.Message}\nEnsure SQL Server is running and the table structure is correct.\nStack Trace: {ex.StackTrace}", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (OutOfMemoryException ex)
+            {
+                MessageBox.Show($"Memory error: {ex.Message}\nThe operation failed due to insufficient memory. Try restarting the application or using a different image.\nRecommended: Max size 2MB, Max dimensions 2000x2000 pixels.\nStack Trace: {ex.StackTrace}", "Image Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An unexpected error occurred: {ex.Message}\nStack Trace: {ex.StackTrace}\nRecommended image: Max size 2MB, Max dimensions 2000x2000 pixels.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnDelete_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(txtEmployeeID.Text))
+                {
+                    MessageBox.Show("Please select an employee to delete.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (!int.TryParse(txtEmployeeID.Text, out int employeeId))
+                {
+                    MessageBox.Show("Employee ID must be a valid number.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                DialogResult result = MessageBox.Show("Are you sure you want to delete this employee?", "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result != DialogResult.Yes)
+                    return;
+
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string query = "DELETE FROM EmployeeProfile WHERE EmployeeID = @EmployeeID";
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@EmployeeID", employeeId);
+                        int rowsAffected = command.ExecuteNonQuery();
+
+                        if (rowsAffected > 0)
+                        {
+                            MessageBox.Show("Employee deleted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            txtEmployeeID.Text = "";
+                            txtEmployeeName.Text = "";
+                            txtFatherName.Text = "";
+                            txtDesignation.Text = "";
+                            txtDeptID.Text = "";
+                            txtDOB.Text = "";
+                            txtDOA.Text = "";
+                            txtCNIC.Text = "";
+                            txtGSalary.Text = "";
+                            txtDOR.Text = "";
+                            txtDepoNo.Text = "";
+                            txtDutyIn.Text = "";
+                            txtDutyOut.Text = "";
+                            pictureEmployee.Image?.Dispose();
+                            pictureEmployee.Image = null;
+                            SetFormFieldsEnabled(false);
+                        }
+                        else
+                        {
+                            MessageBox.Show("Employee not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred: {ex.Message}\nStack Trace: {ex.StackTrace}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnOpen_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (Form gridForm = new Form())
+                {
+                    TextBox txtSearch = new TextBox
+                    {
+                        Location = new Point(10, 10),
+                        Width = 200,
+                        PlaceholderText = "Search by Name or CNIC"
+                    };
+
+                    DataGridView dataGridView = new DataGridView
+                    {
+                        Location = new Point(10, 40),
+                        Size = new Size(760, 310),
+                        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                        ReadOnly = true
+                    };
+
+                    DataTable dataTable = new DataTable();
+                    using (SqlConnection connection = new SqlConnection(connectionString))
+                    {
+                        connection.Open();
+                        string query = "SELECT EmployeeID, EmployeeName, FatherName, Designation, DeptID, DOB, DOA, CNIC, GSalary, DOR, Address, DutyIn, DutyOut, EmployeeImage FROM EmployeeProfile";
+                        using (SqlDataAdapter adapter = new SqlDataAdapter(query, connection))
+                        {
+                            adapter.Fill(dataTable);
+                            dataGridView.DataSource = dataTable;
+                        }
+                    }
+
+                    txtSearch.TextChanged += (s, args) =>
+                    {
+                        DataView dv = dataTable.DefaultView;
+                        string filter = $"EmployeeName LIKE '%{txtSearch.Text}%' OR CNIC LIKE '%{txtSearch.Text}%'";
+                        dv.RowFilter = filter;
+                    };
+
+                    dataGridView.CellDoubleClick += (s, args) =>
+                    {
+                        if (dataGridView.CurrentRow != null)
+                        {
+                            DataGridViewRow row = dataGridView.CurrentRow;
+                            txtEmployeeID.Text = row.Cells["EmployeeID"].Value?.ToString() ?? "";
+                            txtEmployeeName.Text = row.Cells["EmployeeName"].Value?.ToString() ?? "";
+                            txtFatherName.Text = row.Cells["FatherName"].Value?.ToString() ?? "";
+                            txtDesignation.Text = row.Cells["Designation"].Value?.ToString() ?? "";
+                            txtDeptID.Text = row.Cells["DeptID"].Value?.ToString() ?? "";
+                            txtDOB.Text = row.Cells["DOB"].Value != DBNull.Value ? Convert.ToDateTime(row.Cells["DOB"].Value).ToString("yyyy-MM-dd") : "";
+                            txtDOA.Text = row.Cells["DOA"].Value != DBNull.Value ? Convert.ToDateTime(row.Cells["DOA"].Value).ToString("yyyy-MM-dd") : "";
+                            txtCNIC.Text = row.Cells["CNIC"].Value?.ToString() ?? "";
+                            txtGSalary.Text = row.Cells["GSalary"].Value != DBNull.Value ? Convert.ToDecimal(row.Cells["GSalary"].Value).ToString("F2") : "";
+                            txtDOR.Text = row.Cells["DOR"].Value != DBNull.Value ? Convert.ToDateTime(row.Cells["DOR"].Value).ToString("yyyy-MM-dd") : "";
+                            txtDepoNo.Text = row.Cells["Address"].Value?.ToString() ?? "";
+                            txtDutyIn.Text = row.Cells["DutyIn"].Value != DBNull.Value ? row.Cells["DutyIn"].Value.ToString() : "";
+                            txtDutyOut.Text = row.Cells["DutyOut"].Value != DBNull.Value ? row.Cells["DutyOut"].Value.ToString() : "";
+                            if (row.Cells["EmployeeImage"].Value != DBNull.Value)
+                            {
+                                byte[] imageData = (byte[])row.Cells["EmployeeImage"].Value;
+                                using (MemoryStream ms = new MemoryStream(imageData))
+                                {
+                                    pictureEmployee.Image?.Dispose();
+                                    pictureEmployee.Image = Image.FromStream(ms);
+                                }
+                            }
+                            else
+                            {
+                                pictureEmployee.Image?.Dispose();
+                                pictureEmployee.Image = null;
+                            }
+                            SetFormFieldsEnabled(true);
+                            txtEmployeeID.Enabled = false;
+                            gridForm.Close();
+                        }
+                    };
+
+                    gridForm.Controls.Add(txtSearch);
+                    gridForm.Controls.Add(dataGridView);
+                    gridForm.Size = new Size(800, 400);
+                    gridForm.Text = "Select Employee";
+                    gridForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                    gridForm.MaximizeBox = false;
+                    gridForm.MinimizeBox = false;
+                    gridForm.ShowDialog();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred: {ex.Message}\nStack Trace: {ex.StackTrace}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnPrint_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(txtEmployeeID.Text))
+                {
+                    MessageBox.Show("Please select or enter an employee to print.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (!int.TryParse(txtEmployeeID.Text, out int employeeId))
+                {
+                    MessageBox.Show("Employee ID must be a valid number.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string query = "SELECT EmployeeID, EmployeeName, FatherName, Designation, DeptID, DOB, DOA, CNIC, GSalary, DOR, Address, DutyIn, DutyOut, EmployeeImage FROM EmployeeProfile WHERE EmployeeID = @EmployeeID";
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@EmployeeID", employeeId);
+                        using (SqlDataAdapter adapter = new SqlDataAdapter(command))
+                        {
+                            printData = new DataTable();
+                            adapter.Fill(printData);
+
+                            if (printData.Rows.Count > 0)
+                            {
+                                PrintPreviewDialog printPreviewDialog = new PrintPreviewDialog
+                                {
+                                    Document = printDocument
+                                };
+                                printPreviewDialog.ShowDialog();
+                            }
+                            else
+                            {
+                                MessageBox.Show("No data found for the selected employee.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred: {ex.Message}\nStack Trace: {ex.StackTrace}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void PrintDocument_PrintPage(object sender, PrintPageEventArgs e)
+        {
+            if (printData != null && printData.Rows.Count > 0)
+            {
+                DataRow row = printData.Rows[0];
+                float yPos = 100f;
+                float leftMargin = e.MarginBounds.Left + 50f;
+                float topMargin = e.MarginBounds.Top;
+                Font titleFont = new Font("Arial", 16, FontStyle.Bold);
+                Font headerFont = new Font("Arial", 12, FontStyle.Bold);
+                Font bodyFont = new Font("Arial", 10);
+
+                if (row["EmployeeImage"] != DBNull.Value)
+                {
+                    byte[] imageData = (byte[])row["EmployeeImage"];
+                    using (MemoryStream ms = new MemoryStream(imageData))
+                    {
+                        Image img = Image.FromStream(ms);
+                        e.Graphics.DrawImage(img, leftMargin, yPos, 100, 100);
+                        yPos += 120;
+                    }
+                }
+
+                e.Graphics.DrawString("Employee Profile", titleFont, Brushes.Black, e.MarginBounds.Left + (e.MarginBounds.Width - e.Graphics.MeasureString("Employee Profile", titleFont).Width) / 2, topMargin + 20);
+                yPos += 50;
+
+                string[] labels = { "Employee ID:", "Name:", "Father's Name:", "Designation:", "Department ID:", "Date of Birth:", "Date of Appointment:", "CNIC:", "Gross Salary:", "Date of Retirement:", "Address:", "Duty In:", "Duty Out:" };
+                string[] values = {
+                    row["EmployeeID"].ToString(),
+                    row["EmployeeName"].ToString(),
+                    row["FatherName"].ToString(),
+                    row["Designation"].ToString(),
+                    row["DeptID"].ToString(),
+                    row["DOB"] != DBNull.Value ? Convert.ToDateTime(row["DOB"]).ToString("yyyy-MM-dd") : "",
+                    row["DOA"] != DBNull.Value ? Convert.ToDateTime(row["DOA"]).ToString("yyyy-MM-dd") : "",
+                    row["CNIC"].ToString(),
+                    row["GSalary"] != DBNull.Value ? Convert.ToDecimal(row["GSalary"]).ToString("F2") : "",
+                    row["DOR"] != DBNull.Value ? Convert.ToDateTime(row["DOR"]).ToString("yyyy-MM-dd") : "",
+                    row["Address"].ToString(),
+                    row["DutyIn"] != DBNull.Value ? row["DutyIn"].ToString() : "",
+                    row["DutyOut"] != DBNull.Value ? row["DutyOut"].ToString() : ""
+                };
+
+                for (int i = 0; i < labels.Length; i++)
+                {
+                    e.Graphics.DrawString(labels[i], headerFont, Brushes.Black, leftMargin, yPos);
+                    e.Graphics.DrawString(values[i], bodyFont, Brushes.Black, leftMargin + 150, yPos);
+                    yPos += 30;
+                }
+
+                e.Graphics.DrawString("Printed on: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), bodyFont, Brushes.Black, leftMargin, yPos + 20);
+            }
+        }
+
+        private void btnSelectImage_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    ofd.Filter = "Image Files|*.jpg;*.jpeg;*.png;*.bmp";
+                    ofd.Title = "Select a New Employee Photo";
+                    if (ofd.ShowDialog() == DialogResult.OK)
+                    {
+                        // Validate image before loading
+                        FileInfo fileInfo = new FileInfo(ofd.FileName);
+                        if (fileInfo.Length > 2 * 1024 * 1024) // 2MB limit
+                        {
+                            MessageBox.Show("Image size exceeds 2MB limit. Please select a smaller file.", "Image Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                        using (Image tempImage = Image.FromFile(ofd.FileName))
+                        {
+                            if (tempImage.Width > 2000 || tempImage.Height > 2000)
+                            {
+                                MessageBox.Show("Image dimensions exceed 2000x2000 pixels. Please resize the image.", "Image Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                return;
+                            }
+                            pictureEmployee.Image?.Dispose();
+                            pictureEmployee.Image = (Image)tempImage.Clone();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading image: {ex.Message}\nStack Trace: {ex.StackTrace}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnEditImage_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (pictureEmployee.Image == null)
+                {
+                    MessageBox.Show("No image loaded to edit.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                using (ImageEditorForm editorForm = new ImageEditorForm(pictureEmployee.Image))
+                {
+                    if (editorForm.ShowDialog() == DialogResult.OK)
+                    {
+                        pictureEmployee.Image?.Dispose();
+                        pictureEmployee.Image = editorForm.EditedImage;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error editing image: {ex.Message}\nStack Trace: {ex.StackTrace}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnEDITphoto_Click(object sender, EventArgs e)
+        {
+        }
+
+        private void btnEDITphoto_Click_1(object sender, EventArgs e)
+        {
+            try
+            {
+                // Create a file dialog to let the user pick a new image
+                using (OpenFileDialog openFileDialog = new OpenFileDialog())
+                {
+                    openFileDialog.Filter = "Image Files|*.jpg;*.jpeg;*.png;*.bmp"; // Set allowed image types
+                    openFileDialog.Title = "Update Employee Photo"; // Set a clear title for the dialog
+
+                    // Show the dialog and check if user selected a file
+                    if (openFileDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Get file info to check size
+                        FileInfo fileInfo = new FileInfo(openFileDialog.FileName);
+                        if (fileInfo.Length > 2 * 1024 * 1024) // Check if file is under 2MB
+                        {
+                            MessageBox.Show("Image size exceeds 2MB limit. Please choose a smaller file.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return; // Stop if too large
+                        }
+
+                        // Load and validate the image
+                        using (Image tempImage = Image.FromFile(openFileDialog.FileName))
+                        {
+                            if (tempImage.Width > 2000 || tempImage.Height > 2000) // Check if dimensions are under 2000x2000
+                            {
+                                MessageBox.Show("Image dimensions exceed 2000x2000 pixels. Please resize the image.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                return; // Stop if too big
+                            }
+
+                            // Clear old image and set new one
+                            pictureEmployee.Image?.Dispose(); // Free memory from old image
+                            pictureEmployee.Image = (Image)tempImage.Clone(); // Load new image
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Show error if something goes wrong
+                MessageBox.Show($"Error updating image: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private byte[] ImageToByteArray(Image image)
+        {
+            using (MemoryStream ms = new MemoryStream())
+            {
+                image.Save(ms, image.RawFormat);
+                return ms.ToArray();
+            }
+        }
+
+        private void pictureEmployee_Click(object sender, EventArgs e)
+        {
+        }
+
+        private void splitContainer1_SplitterMoved(object sender, SplitterEventArgs e)
+        {
+        }
+
+        private void groupBox2_Enter(object sender, EventArgs e)
+        {
+
+        }
+    }
+
+    public class ImageEditorForm : Form
+    {
+        private PictureBox pictureBox;
+        private Button btnCrop;
+        private Button btnResize;
+        private Button btnSave;
+        private Button btnCancel;
+        private Image originalImage;
+        private Image editedImage;
+        private NumericUpDown numWidth;
+        private NumericUpDown numHeight;
+        private NumericUpDown numCropX;
+        private NumericUpDown numCropY;
+        private NumericUpDown numCropWidth;
+        private NumericUpDown numCropHeight;
+
+        public Image EditedImage => editedImage;
+
+        public ImageEditorForm(Image image)
+        {
+            originalImage = image;
+            editedImage = (Image)image.Clone();
+            InitializeComponents();
+        }
+
+        private void InitializeComponents()
+        {
+            this.Size = new Size(600, 500);
+            this.Text = "Image Editor";
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+
+            pictureBox = new PictureBox
+            {
+                Location = new Point(10, 10),
+                Size = new Size(400, 400),
+                Image = editedImage,
+                SizeMode = PictureBoxSizeMode.Zoom
+            };
+
+            btnCrop = new Button
+            {
+                Text = "Crop",
+                Location = new Point(420, 10),
+                Size = new Size(100, 30)
+            };
+            btnCrop.Click += BtnCrop_Click;
+
+            btnResize = new Button
+            {
+                Text = "Resize",
+                Location = new Point(420, 50),
+                Size = new Size(100, 30)
+            };
+            btnResize.Click += BtnResize_Click;
+
+            btnSave = new Button
+            {
+                Text = "Save",
+                Location = new Point(420, 410),
+                Size = new Size(100, 30),
+                DialogResult = DialogResult.OK
+            };
+
+            btnCancel = new Button
+            {
+                Text = "Cancel",
+                Location = new Point(420, 450),
+                Size = new Size(100, 30),
+                DialogResult = DialogResult.Cancel
+            };
+
+            numWidth = new NumericUpDown
+            {
+                Location = new Point(420, 90),
+                Size = new Size(100, 20),
+                Minimum = 1,
+                Maximum = 2000,
+                Value = editedImage.Width
+            };
+
+            numHeight = new NumericUpDown
+            {
+                Location = new Point(420, 120),
+                Size = new Size(100, 20),
+                Minimum = 1,
+                Maximum = 2000,
+                Value = editedImage.Height
+            };
+
+            numCropX = new NumericUpDown
+            {
+                Location = new Point(420, 160),
+                Size = new Size(100, 20),
+                Minimum = 0,
+                Maximum = editedImage.Width,
+                Value = 0
+            };
+
+            numCropY = new NumericUpDown
+            {
+                Location = new Point(420, 190),
+                Size = new Size(100, 20),
+                Minimum = 0,
+                Maximum = editedImage.Height,
+                Value = 0
+            };
+
+            numCropWidth = new NumericUpDown
+            {
+                Location = new Point(420, 220),
+                Size = new Size(100, 20),
+                Minimum = 1,
+                Maximum = editedImage.Width,
+                Value = editedImage.Width
+            };
+
+            numCropHeight = new NumericUpDown
+            {
+                Location = new Point(420, 250),
+                Size = new Size(100, 20),
+                Minimum = 1,
+                Maximum = editedImage.Height,
+                Value = editedImage.Height
+            };
+
+            this.Controls.AddRange(new Control[] { pictureBox, btnCrop, btnResize, btnSave, btnCancel, numWidth, numHeight, numCropX, numCropY, numCropWidth, numCropHeight });
+        }
+
+        private void BtnCrop_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                int x = (int)numCropX.Value;
+                int y = (int)numCropY.Value;
+                int width = (int)numCropWidth.Value;
+                int height = (int)numCropHeight.Value;
+
+                if (x + width > originalImage.Width || y + height > originalImage.Height)
+                {
+                    MessageBox.Show("Crop dimensions exceed image size.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                using (Bitmap bmp = new Bitmap(originalImage))
+                {
+                    Rectangle cropArea = new Rectangle(x, y, width, height);
+                    editedImage.Dispose();
+                    editedImage = bmp.Clone(cropArea, bmp.PixelFormat);
+                    pictureBox.Image = editedImage;
+                    numWidth.Value = editedImage.Width;
+                    numHeight.Value = editedImage.Height;
+                    numCropWidth.Maximum = editedImage.Width;
+                    numCropHeight.Maximum = editedImage.Height;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error cropping image: {ex.Message}\nStack Trace: {ex.StackTrace}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnResize_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                int newWidth = (int)numWidth.Value;
+                int newHeight = (int)numHeight.Value;
+
+                using (Bitmap bmp = new Bitmap(originalImage))
+                {
+                    editedImage.Dispose();
+                    editedImage = new Bitmap(bmp, newWidth, newHeight);
+                    pictureBox.Image = editedImage;
+                    numCropWidth.Maximum = editedImage.Width;
+                    numCropHeight.Maximum = editedImage.Height;
+                    numCropX.Maximum = editedImage.Width;
+                    numCropY.Maximum = editedImage.Height;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error resizing image: {ex.Message}\nStack Trace: {ex.StackTrace}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                originalImage?.Dispose();
+                editedImage?.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+    }
+}
