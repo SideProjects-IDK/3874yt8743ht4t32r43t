@@ -51,3 +51,7 @@ D:\Agepay\AgePay\obj\Release\net9.0-windows\AgePay.frmManualTimeRegister.resourc
 D:\Agepay\AgePay\obj\Release\net9.0-windows\AgePay.MainPanel.resources
 D:\Agepay\AgePay\bin\Release\net9.0-windows\ExcelDataReader.dll
 D:\Agepay\AgePay\bin\Release\net9.0-windows\LumenWorks.Framework.IO.dll
+D:\Agepay\AgePay\obj\Release\net9.0-windows\AgePay.frmEditHoliday.resources
+D:\Agepay\AgePay\obj\Release\net9.0-windows\AgePay.mainpanel_utils.frmExportAttendance.resources
+D:\Agepay\AgePay\obj\Release\net9.0-windows\AgePay.Properties.Resources.resources
+D:\Agepay\AgePay\obj\Release\net9.0-windows\AgePay.frmLogin.resources
