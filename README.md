@@ -32,3 +32,13 @@
 
 <img width="1027" height="828" alt="image" src="https://github.com/user-attachments/assets/3178abbe-38d9-46dc-a83e-5f1382508661" />
 <img width="525" height="609" alt="image" src="https://github.com/user-attachments/assets/91be07ad-25b3-4183-8a2a-e10cfe7804a0" />
+
+
+## HOLIDAY
+<img width="1192" height="580" alt="image" src="https://github.com/user-attachments/assets/ab113935-f6e1-4c46-8448-76c84eb340bc" />
+<img width="488" height="278" alt="image" src="https://github.com/user-attachments/assets/62af721e-663e-49bd-9fb4-f06d093a0a9a" />
+<img width="531" height="251" alt="image" src="https://github.com/user-attachments/assets/1276c8da-5cfe-4406-a0c4-590a644f0f4a" />
+<img width="824" height="424" alt="image" src="https://github.com/user-attachments/assets/ecf5523e-5d77-4046-a3d2-c175612ed1f8" />
+<img width="689" height="398" alt="image" src="https://github.com/user-attachments/assets/a2f5461f-9032-41af-8a25-f2ffdd43bf30" />
+### DONT PRESSTHIS: 
+<img width="144" height="61" alt="image" src="https://github.com/user-attachments/assets/1a7e2ce6-b39e-43fb-9bc4-f9fa20dc2155" />
