@@ -8,161 +8,36 @@ namespace AgePay
 {
     public partial class frmEditHoliday : Form
     {
-        private readonly SqlConnection connection = ConnectToSqlDatabase_MsSQL.GetConnection();
-       
+        private readonly string connectionString = ConnectToSqlDatabase_MsSQL.connectionString;
 
         public frmEditHoliday()
         {
             InitializeComponent();
             InitializeDataGridView();
-            InitializeButtons();
         }
 
         private void InitializeDataGridView()
         {
-           
-        }
-
-        private void InitializeButtons()
-        {
-            // Add Sundays button
-            Button btnAddSundays = new Button
-            {
-                Text = "Add Sundays",
-                Location = new Point(120, 410),
-                Size = new Size(100, 30),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                BackColor = Color.FromArgb(108, 117, 125),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                FlatAppearance = { BorderSize = 0, MouseOverBackColor = Color.FromArgb(150, 159, 167) }
-            };
-            btnAddSundays.MouseEnter += (s, e) => btnAddSundays.BackColor = Color.FromArgb(150, 159, 167);
-            btnAddSundays.MouseLeave += (s, e) => btnAddSundays.BackColor = Color.FromArgb(108, 117, 125);
-            btnAddSundays.Click += BtnAddSundays_Click;
-
-            // Delete All button
-            Button btnDeleteAll = new Button
-            {
-                Text = "Delete All",
-                Location = new Point(230, 410),
-                Size = new Size(100, 30),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                BackColor = Color.FromArgb(108, 117, 125),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                FlatAppearance = { BorderSize = 0, MouseOverBackColor = Color.FromArgb(150, 159, 167) }
-            };
-            btnDeleteAll.MouseEnter += (s, e) => btnDeleteAll.BackColor = Color.FromArgb(150, 159, 167);
-            btnDeleteAll.MouseLeave += (s, e) => btnDeleteAll.BackColor = Color.FromArgb(108, 117, 125);
-            btnDeleteAll.Click += BtnDeleteAll_Click;
-
-            this.Controls.Add(btnAddSundays);
-            this.Controls.Add(btnDeleteAll);
-        }
-
-        private void BtnAddSundays_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                int currentYear = DateTime.Today.Year;
-                DateTime startDate = new DateTime(currentYear, 1, 1);
-                // Find first Sunday
-                while (startDate.DayOfWeek != DayOfWeek.Sunday)
-                {
-                    startDate = startDate.AddDays(1);
-                }
-
-                int inserted = 0;
-                int updated = 0;
-                // Iterate through all Sundays in the year
-                while (startDate.Year == currentYear)
-                {
-                    string holidayDetail = $"Sunday - {startDate:MMMM d, yyyy}";
-
-                    // Check if holiday exists
-                    string checkQuery = "SELECT COUNT(*) FROM Holidays WHERE [Date] = @Date";
-                    using (SqlCommand checkCommand = new SqlCommand(checkQuery, connection))
-                    {
-                        checkCommand.Parameters.AddWithValue("@Date", startDate);
-                        int count = (int)checkCommand.ExecuteScalar();
-
-                        if (count > 0)
-                        {
-                            // Update existing holiday
-                            string updateQuery = "UPDATE Holidays SET HolidayDetail = @HolidayDetail WHERE [Date] = @Date";
-                            using (SqlCommand updateCommand = new SqlCommand(updateQuery, connection))
-                            {
-                                updateCommand.Parameters.AddWithValue("@Date", startDate);
-                                updateCommand.Parameters.AddWithValue("@HolidayDetail", holidayDetail);
-                                updateCommand.ExecuteNonQuery();
-                            }
-                            updated++;
-                        }
-                        else
-                        {
-                            // Insert new holiday
-                            string insertQuery = "INSERT INTO Holidays ([Date], HolidayDetail) VALUES (@Date, @HolidayDetail)";
-                            using (SqlCommand insertCommand = new SqlCommand(insertQuery, connection))
-                            {
-                                insertCommand.Parameters.AddWithValue("@Date", startDate);
-                                insertCommand.Parameters.AddWithValue("@HolidayDetail", holidayDetail);
-                                insertCommand.ExecuteNonQuery();
-                            }
-                            inserted++;
-                        }
-                    }
-
-                    startDate = startDate.AddDays(7); // Move to next Sunday
-                }
-
-                MessageBox.Show($"Successfully processed Sundays for {currentYear}: {inserted} added, {updated} updated.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                LoadHolidays();
-                UpdateYearStatistics();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error adding Sundays: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void BtnDeleteAll_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                DialogResult result = MessageBox.Show("Are you sure you want to delete all holidays? This action cannot be undone.", "Confirm Delete All", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-                if (result != DialogResult.Yes)
-                    return;
-
-                string query = "DELETE FROM Holidays";
-                using (SqlCommand command = new SqlCommand(query, connection))
-                {
-                    command.ExecuteNonQuery();
-                }
-
-                MessageBox.Show("All holidays deleted successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                LoadHolidays();
-                UpdateYearStatistics();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error deleting all holidays: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            // Assume DataGridView is set up in the designer
         }
 
         private void frmEditHoliday_Load(object sender, EventArgs e)
         {
             try
             {
-                // Check if Holidays table exists
-                string checkTableQuery = "SELECT 1 FROM sys.tables WHERE name = 'Holidays'";
-                using (SqlCommand checkCommand = new SqlCommand(checkTableQuery, connection))
+                using (SqlConnection connection = new SqlConnection(connectionString))
                 {
-                    object result = checkCommand.ExecuteScalar();
-                    if (result == null)
+                    // Check if Holidays table exists
+                    string checkTableQuery = "SELECT 1 FROM sys.tables WHERE name = 'Holidays'";
+                    using (SqlCommand checkCommand = new SqlCommand(checkTableQuery, connection))
                     {
-                        MessageBox.Show("The table 'Holidays' does not exist in the database. Please create the table.", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
+                        connection.Open();
+                        object result = checkCommand.ExecuteScalar();
+                        if (result == null)
+                        {
+                            MessageBox.Show("The table 'Holidays' does not exist in the database. Please create the table.", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
                     }
                 }
 
@@ -175,47 +50,245 @@ namespace AgePay
             }
         }
 
+        private void BtnAddSundays_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    int currentYear = DateTime.Today.Year;
+                    DateTime startDate = new DateTime(currentYear, 1, 1);
+                    // Find first Sunday
+                    while (startDate.DayOfWeek != DayOfWeek.Sunday)
+                    {
+                        startDate = startDate.AddDays(1);
+                    }
+
+                    int inserted = 0;
+                    int updated = 0;
+                    // Iterate through all Sundays in the year
+                    while (startDate.Year == currentYear)
+                    {
+                        string holidayDetail = $"Sunday - {startDate:MMMM d, yyyy}";
+
+                        // Check if holiday exists
+                        string checkQuery = "SELECT COUNT(*) FROM Holidays WHERE [Date] = @Date";
+                        using (SqlCommand checkCommand = new SqlCommand(checkQuery, connection))
+                        {
+                            checkCommand.Parameters.AddWithValue("@Date", startDate);
+                            int count = (int)checkCommand.ExecuteScalar();
+
+                            if (count > 0)
+                            {
+                                // Update existing holiday
+                                string updateQuery = "UPDATE Holidays SET HolidayDetail = @HolidayDetail WHERE [Date] = @Date";
+                                using (SqlCommand updateCommand = new SqlCommand(updateQuery, connection))
+                                {
+                                    updateCommand.Parameters.AddWithValue("@Date", startDate);
+                                    updateCommand.Parameters.AddWithValue("@HolidayDetail", holidayDetail);
+                                    updateCommand.ExecuteNonQuery();
+                                }
+                                updated++;
+                            }
+                            else
+                            {
+                                // Insert new holiday
+                                string insertQuery = "INSERT INTO Holidays ([Date], HolidayDetail) VALUES (@Date, @HolidayDetail)";
+                                using (SqlCommand insertCommand = new SqlCommand(insertQuery, connection))
+                                {
+                                    insertCommand.Parameters.AddWithValue("@Date", startDate);
+                                    insertCommand.Parameters.AddWithValue("@HolidayDetail", holidayDetail);
+                                    insertCommand.ExecuteNonQuery();
+                                }
+                                inserted++;
+                            }
+                        }
+
+                        startDate = startDate.AddDays(7); // Move to next Sunday
+                    }
+
+                    MessageBox.Show($"Successfully processed Sundays for {currentYear}: {inserted} added, {updated} updated.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    LoadHolidays();
+                    UpdateYearStatistics();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding Sundays: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnDeleteAll_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    DialogResult result = MessageBox.Show("Are you sure you want to delete all holidays? This action cannot be undone.", "Confirm Delete All", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                    if (result != DialogResult.Yes)
+                        return;
+
+                    string query = "DELETE FROM Holidays";
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+
+                    MessageBox.Show("All holidays deleted successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    LoadHolidays();
+                    UpdateYearStatistics();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error deleting all holidays: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void Button2_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    int currentYear = DateTime.Today.Year;
+                    DateTime startDate = new DateTime(currentYear, 1, 1);
+                    // Find first Sunday
+                    while (startDate.DayOfWeek != DayOfWeek.Sunday)
+                    {
+                        startDate = startDate.AddDays(1);
+                    }
+
+                    int inserted = 0;
+                    int updated = 0;
+                    // Iterate through all Sundays in the year
+                    while (startDate.Year == currentYear)
+                    {
+                        string holidayDetail = $"Sunday - {startDate:MMMM d, yyyy}";
+
+                        // Check if holiday exists
+                        string checkQuery = "SELECT COUNT(*) FROM Holidays WHERE [Date] = @Date";
+                        using (SqlCommand checkCommand = new SqlCommand(checkQuery, connection))
+                        {
+                            checkCommand.Parameters.AddWithValue("@Date", startDate);
+                            int count = (int)checkCommand.ExecuteScalar();
+
+                            if (count > 0)
+                            {
+                                // Update existing holiday
+                                string updateQuery = "UPDATE Holidays SET HolidayDetail = @HolidayDetail WHERE [Date] = @Date";
+                                using (SqlCommand updateCommand = new SqlCommand(updateQuery, connection))
+                                {
+                                    updateCommand.Parameters.AddWithValue("@Date", startDate);
+                                    updateCommand.Parameters.AddWithValue("@HolidayDetail", holidayDetail);
+                                    updateCommand.ExecuteNonQuery();
+                                }
+                                updated++;
+                            }
+                            else
+                            {
+                                // Insert new holiday
+                                string insertQuery = "INSERT INTO Holidays ([Date], HolidayDetail) VALUES (@Date, @HolidayDetail)";
+                                using (SqlCommand insertCommand = new SqlCommand(insertQuery, connection))
+                                {
+                                    insertCommand.Parameters.AddWithValue("@Date", startDate);
+                                    insertCommand.Parameters.AddWithValue("@HolidayDetail", holidayDetail);
+                                    insertCommand.ExecuteNonQuery();
+                                }
+                                inserted++;
+                            }
+                        }
+
+                        startDate = startDate.AddDays(7); // Move to next Sunday
+                    }
+
+                    MessageBox.Show($"Successfully processed Sundays for {currentYear}: {inserted} added, {updated} updated.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    LoadHolidays();
+                    UpdateYearStatistics();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding Sundays: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void Button3_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    DialogResult result = MessageBox.Show("Are you sure you want to delete all holidays? This action cannot be undone.", "Confirm Delete All", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                    if (result != DialogResult.Yes)
+                        return;
+
+                    string query = "DELETE FROM Holidays";
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+
+                    MessageBox.Show("All holidays deleted successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    LoadHolidays();
+                    UpdateYearStatistics();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error deleting all holidays: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         private void LoadHolidays(string searchDate = null, string searchName = null)
         {
             try
             {
-                string query = "SELECT [Date], HolidayDetail FROM Holidays";
-                if (!string.IsNullOrWhiteSpace(searchDate) || !string.IsNullOrWhiteSpace(searchName))
+                using (SqlConnection connection = new SqlConnection(connectionString))
                 {
-                    query += " WHERE 1=1";
-                    if (!string.IsNullOrWhiteSpace(searchDate))
-                        query += " AND [Date] = @Date";
-                    if (!string.IsNullOrWhiteSpace(searchName))
-                        query += " AND HolidayDetail LIKE @HolidayDetail";
-                }
-
-                using (SqlCommand command = new SqlCommand(query, connection))
-                {
-                    if (!string.IsNullOrWhiteSpace(searchDate))
-                        command.Parameters.AddWithValue("@Date", searchDate);
-                    if (!string.IsNullOrWhiteSpace(searchName))
-                        command.Parameters.AddWithValue("@HolidayDetail", $"%{searchName}%");
-
-                    using (SqlDataAdapter adapter = new SqlDataAdapter(command))
+                    connection.Open();
+                    string query = "SELECT [Date], HolidayDetail FROM Holidays";
+                    if (!string.IsNullOrWhiteSpace(searchDate) || !string.IsNullOrWhiteSpace(searchName))
                     {
-                        DataTable dataTable = new DataTable();
-                        adapter.Fill(dataTable);
-
-                        if (dataTable.Rows.Count == 0 && string.IsNullOrWhiteSpace(searchDate) && string.IsNullOrWhiteSpace(searchName))
-                        {
-                            MessageBox.Show("No holidays found in the database. Please add holidays to display them.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-
-                        dataGridView1.DataSource = dataTable;
-
-                        // Update search textbox colors based on results
+                        query += " WHERE 1=1";
                         if (!string.IsNullOrWhiteSpace(searchDate))
-                        {
-                            txt_search_with_date.ForeColor = dataTable.Rows.Count > 0 ? Color.Black : Color.Red;
-                        }
+                            query += " AND [Date] = @Date";
                         if (!string.IsNullOrWhiteSpace(searchName))
+                            query += " AND HolidayDetail LIKE @HolidayDetail";
+                    }
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        if (!string.IsNullOrWhiteSpace(searchDate))
+                            command.Parameters.AddWithValue("@Date", searchDate);
+                        if (!string.IsNullOrWhiteSpace(searchName))
+                            command.Parameters.AddWithValue("@HolidayDetail", $"%{searchName}%");
+
+                        using (SqlDataAdapter adapter = new SqlDataAdapter(command))
                         {
-                            txt_search_with_name.ForeColor = dataTable.Rows.Count > 0 ? Color.Black : Color.Red;
+                            DataTable dataTable = new DataTable();
+                            adapter.Fill(dataTable);
+
+                            if (dataTable.Rows.Count == 0 && string.IsNullOrWhiteSpace(searchDate) && string.IsNullOrWhiteSpace(searchName))
+                            {
+                                MessageBox.Show("No holidays found in the database. Please add holidays to display them.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
+
+                            dataGridView1.DataSource = dataTable;
+
+                            // Update search textbox colors based on results
+                            if (!string.IsNullOrWhiteSpace(searchDate))
+                            {
+                                txt_search_with_date.ForeColor = dataTable.Rows.Count > 0 ? Color.Black : Color.Red;
+                            }
+                            if (!string.IsNullOrWhiteSpace(searchName))
+                            {
+                                txt_search_with_name.ForeColor = dataTable.Rows.Count > 0 ? Color.Black : Color.Red;
+                            }
                         }
                     }
                 }
@@ -230,16 +303,20 @@ namespace AgePay
         {
             try
             {
-                int currentYear = DateTime.Today.Year;
-                bool isLeapYear = DateTime.IsLeapYear(currentYear);
-                lbl_days_in_this_year.Text = $"Days in {currentYear}: {(isLeapYear ? 366 : 365)}";
-
-                string query = "SELECT COUNT(*) FROM Holidays WHERE YEAR([Date]) = @Year";
-                using (SqlCommand command = new SqlCommand(query, connection))
+                using (SqlConnection connection = new SqlConnection(connectionString))
                 {
-                    command.Parameters.AddWithValue("@Year", currentYear);
-                    int holidayCount = (int)command.ExecuteScalar();
-                    lbl_count_of_toall_holidays_this_year.Text = $"Total Holidays in {currentYear}: {holidayCount}";
+                    connection.Open();
+                    int currentYear = DateTime.Today.Year;
+                    bool isLeapYear = DateTime.IsLeapYear(currentYear);
+                    lbl_days_in_this_year.Text = $"Days in {currentYear}: {(isLeapYear ? 366 : 365)}";
+
+                    string query = "SELECT COUNT(*) FROM Holidays WHERE YEAR([Date]) = @Year";
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Year", currentYear);
+                        int holidayCount = (int)command.ExecuteScalar();
+                        lbl_count_of_toall_holidays_this_year.Text = $"Total Holidays in {currentYear}: {holidayCount}";
+                    }
                 }
             }
             catch (Exception ex)
@@ -394,21 +471,25 @@ namespace AgePay
         {
             try
             {
-                DialogResult result = MessageBox.Show($"Are you sure you want to remove the holiday '{holidayDetail}' on {holidayDate:yyyy-MM-dd}?", "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result != DialogResult.Yes)
-                    return;
-
-                string query = "DELETE FROM Holidays WHERE [Date] = @Date";
-                using (SqlCommand command = new SqlCommand(query, connection))
+                using (SqlConnection connection = new SqlConnection(connectionString))
                 {
-                    command.Parameters.AddWithValue("@Date", holidayDate);
-                    command.ExecuteNonQuery();
-                }
+                    connection.Open();
+                    DialogResult result = MessageBox.Show($"Are you sure you want to remove the holiday '{holidayDetail}' on {holidayDate:yyyy-MM-dd}?", "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (result != DialogResult.Yes)
+                        return;
 
-                MessageBox.Show($"Holiday '{holidayDetail}' on {holidayDate:yyyy-MM-dd} removed successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                LoadHolidays();
-                UpdateYearStatistics();
-                actionForm.Close();
+                    string query = "DELETE FROM Holidays WHERE [Date] = @Date";
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Date", holidayDate);
+                        command.ExecuteNonQuery();
+                    }
+
+                    MessageBox.Show($"Holiday '{holidayDetail}' on {holidayDate:yyyy-MM-dd} removed successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    LoadHolidays();
+                    UpdateYearStatistics();
+                    actionForm.Close();
+                }
             }
             catch (Exception ex)
             {
@@ -487,57 +568,61 @@ namespace AgePay
                     {
                         try
                         {
-                            DateTime holidayDate = dtpDate.Value.Date;
-                            string holidayDetail = txtDetail.Text.Trim();
-                            if (string.IsNullOrWhiteSpace(holidayDetail))
+                            using (SqlConnection connection = new SqlConnection(connectionString))
                             {
-                                MessageBox.Show("Please enter a holiday detail.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                return;
+                                connection.Open();
+                                DateTime holidayDate = dtpDate.Value.Date;
+                                string holidayDetail = txtDetail.Text.Trim();
+                                if (string.IsNullOrWhiteSpace(holidayDetail))
+                                {
+                                    MessageBox.Show("Please enter a holiday detail.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    return;
+                                }
+
+                                int count;
+                                string checkQuery = "SELECT COUNT(*) FROM Holidays WHERE [Date] = @Date";
+                                using (SqlCommand checkCommand = new SqlCommand(checkQuery, connection))
+                                {
+                                    checkCommand.Parameters.AddWithValue("@Date", holidayDate);
+                                    count = (int)checkCommand.ExecuteScalar();
+                                }
+
+                                if (isAddMode && count > 0)
+                                {
+                                    MessageBox.Show($"A holiday already exists on {holidayDate:yyyy-MM-dd}. Please choose a different date.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    return;
+                                }
+                                if (!isAddMode && count == 0)
+                                {
+                                    MessageBox.Show($"No holiday found on {holidayDate:yyyy-MM-dd}. Please add a new holiday instead.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    return;
+                                }
+
+                                string action = isAddMode ? "insert" : "update";
+                                string confirmMessage = isAddMode
+                                    ? $"Add new holiday on {holidayDate:yyyy-MM-dd} as '{holidayDetail}'?"
+                                    : $"Update holiday on {holidayDate:yyyy-MM-dd} to '{holidayDetail}'?";
+
+                                DialogResult result = MessageBox.Show(confirmMessage, "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                                if (result != DialogResult.Yes)
+                                    return;
+
+                                string query = isAddMode
+                                    ? "INSERT INTO Holidays ([Date], HolidayDetail) VALUES (@Date, @HolidayDetail)"
+                                    : "UPDATE Holidays SET HolidayDetail = @HolidayDetail WHERE [Date] = @Date";
+
+                                using (SqlCommand command = new SqlCommand(query, connection))
+                                {
+                                    command.Parameters.AddWithValue("@Date", holidayDate);
+                                    command.Parameters.AddWithValue("@HolidayDetail", holidayDetail);
+                                    command.ExecuteNonQuery();
+                                }
+
+                                MessageBox.Show($"Holiday '{holidayDetail}' on {holidayDate:yyyy-MM-dd} {(isAddMode ? "added" : "updated")} successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                LoadHolidays();
+                                UpdateYearStatistics();
+                                editForm.Close();
                             }
-
-                            int count;
-                            string checkQuery = "SELECT COUNT(*) FROM Holidays WHERE [Date] = @Date";
-                            using (SqlCommand checkCommand = new SqlCommand(checkQuery, connection))
-                            {
-                                checkCommand.Parameters.AddWithValue("@Date", holidayDate);
-                                count = (int)checkCommand.ExecuteScalar();
-                            }
-
-                            if (isAddMode && count > 0)
-                            {
-                                MessageBox.Show($"A holiday already exists on {holidayDate:yyyy-MM-dd}. Please choose a different date.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                return;
-                            }
-                            if (!isAddMode && count == 0)
-                            {
-                                MessageBox.Show($"No holiday found on {holidayDate:yyyy-MM-dd}. Please add a new holiday instead.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                return;
-                            }
-
-                            string action = isAddMode ? "insert" : "update";
-                            string confirmMessage = isAddMode
-                                ? $"Add new holiday on {holidayDate:yyyy-MM-dd} as '{holidayDetail}'?"
-                                : $"Update holiday on {holidayDate:yyyy-MM-dd} to '{holidayDetail}'?";
-
-                            DialogResult result = MessageBox.Show(confirmMessage, "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                            if (result != DialogResult.Yes)
-                                return;
-
-                            string query = isAddMode
-                                ? "INSERT INTO Holidays ([Date], HolidayDetail) VALUES (@Date, @HolidayDetail)"
-                                : "UPDATE Holidays SET HolidayDetail = @HolidayDetail WHERE [Date] = @Date";
-
-                            using (SqlCommand command = new SqlCommand(query, connection))
-                            {
-                                command.Parameters.AddWithValue("@Date", holidayDate);
-                                command.Parameters.AddWithValue("@HolidayDetail", holidayDetail);
-                                command.ExecuteNonQuery();
-                            }
-
-                            MessageBox.Show($"Holiday '{holidayDetail}' on {holidayDate:yyyy-MM-dd} {(isAddMode ? "added" : "updated")} successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            LoadHolidays();
-                            UpdateYearStatistics();
-                            editForm.Close();
                         }
                         catch (Exception ex)
                         {
@@ -578,7 +663,6 @@ namespace AgePay
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             base.OnFormClosing(e);
-            ConnectToSqlDatabase_MsSQL.CloseConnection();
         }
     }
 }
