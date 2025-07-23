@@ -1,5 +1,6 @@
 # AgePay
 
+#`I DID NOT HAD TIME FOR DESIGNING, PLEASE KINDLY DO IT YOURSELF! OR WAIT A DAY FOR THAT!`
 
 ## LOGIN
 <img width="919" height="793" alt="image" src="https://github.com/user-attachments/assets/860acbf5-6f5f-45b0-9e4b-305e6ff42d34" />
