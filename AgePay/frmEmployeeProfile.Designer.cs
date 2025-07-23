@@ -63,10 +63,11 @@ namespace AgePay
             btnOpen = new Button();
             btnNew = new Button();
             groupBox2 = new GroupBox();
-            txtDepoNo = new TextBox();
             groupBox3 = new GroupBox();
             btnEDITphoto = new Button();
             pictureEmployee = new PictureBox();
+            comboBox_txtDeptID = new ComboBox();
+            txtDepoNo = new TextBox();
             groupBox1.SuspendLayout();
             groupBox2.SuspendLayout();
             groupBox3.SuspendLayout();
@@ -198,6 +199,7 @@ namespace AgePay
             txtDeptID.Name = "txtDeptID";
             txtDeptID.Size = new Size(45, 23);
             txtDeptID.TabIndex = 12;
+            txtDeptID.TextChanged += txtDeptID_TextChanged;
             // 
             // label8
             // 
@@ -387,6 +389,7 @@ namespace AgePay
             // 
             // groupBox2
             // 
+            groupBox2.Controls.Add(comboBox_txtDeptID);
             groupBox2.Controls.Add(label4);
             groupBox2.Controls.Add(label2);
             groupBox2.Controls.Add(txtDutyOut);
@@ -418,15 +421,6 @@ namespace AgePay
             groupBox2.TabIndex = 27;
             groupBox2.TabStop = false;
             groupBox2.Text = "Info";
-            //groupBox2.Enter += groupBox2_Enter;
-            // 
-            // txtDepoNo
-            // 
-            txtDepoNo.Font = new Font("Consolas", 7.8F);
-            txtDepoNo.Location = new Point(201, 168);
-            txtDepoNo.Name = "txtDepoNo";
-            txtDepoNo.Size = new Size(119, 23);
-            txtDepoNo.TabIndex = 21;
             // 
             // groupBox3
             // 
@@ -458,7 +452,22 @@ namespace AgePay
             pictureEmployee.Size = new Size(253, 195);
             pictureEmployee.TabIndex = 0;
             pictureEmployee.TabStop = false;
-            //pictureEmployee.Click += pictureEmployee_Click;
+            // 
+            // comboBox_txtDeptID
+            // 
+            comboBox_txtDeptID.FormattingEnabled = true;
+            comboBox_txtDeptID.Location = new Point(326, 166);
+            comboBox_txtDeptID.Name = "comboBox_txtDeptID";
+            comboBox_txtDeptID.Size = new Size(151, 26);
+            comboBox_txtDeptID.TabIndex = 26;
+            // 
+            // txtDepoNo
+            // 
+            txtDepoNo.Font = new Font("Consolas", 7.8F);
+            txtDepoNo.Location = new Point(201, 168);
+            txtDepoNo.Name = "txtDepoNo";
+            txtDepoNo.Size = new Size(119, 23);
+            txtDepoNo.TabIndex = 21;
             // 
             // frmEmployeeProfile
             // 
@@ -485,101 +494,7 @@ namespace AgePay
             PerformLayout();
         }
 
-        private void BtnDelete_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(txtEmployeeID.Text) || !int.TryParse(txtEmployeeID.Text, out int employeeId))
-                {
-                    MessageBox.Show("Please select a valid employee to delete.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                DialogResult result = MessageBox.Show("Are you sure you want to delete this employee?", "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result != DialogResult.Yes)
-                    return;
-
-                connection.Open();
-                string query = "DELETE FROM EmployeeProfile WHERE EmployeeID = @EmployeeID";
-                using (SqlCommand command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@EmployeeID", employeeId);
-                    int rowsAffected = command.ExecuteNonQuery();
-
-                    if (rowsAffected > 0)
-                    {
-                        MessageBox.Show("Employee deleted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        txtEmployeeID.Text = "";
-                        txtEmployeeName.Text = "";
-                        txtFatherName.Text = "";
-                        txtDesignation.Text = "";
-                        txtDeptID.Text = "";
-                        txtDOB.Text = "";
-                        txtDOA.Text = "";
-                        txtCNIC.Text = "";
-                        txtGSalary.Text = "";
-                        txtDepoNo.Text = "";
-                        txtDutyIn.Text = "";
-                        txtDutyOut.Text = "";
-                        pictureEmployee.Image?.Dispose();
-                        pictureEmployee.Image = null;
-                        SetFormFieldsEnabled(false);
-                    }
-                    else
-                    {
-                        MessageBox.Show("Employee not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                }
-            }
-            catch (SqlException ex)
-            {
-                MessageBox.Show($"Database error: {ex.Message}", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                if (connection.State == System.Data.ConnectionState.Open)
-                    connection.Close();
-            }
-        }
-
-        private void BtnEDITphoto_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                using (OpenFileDialog ofd = new OpenFileDialog())
-                {
-                    ofd.Filter = "Image Files|*.jpg;*.jpeg;*.png;*.bmp";
-                    ofd.Title = "Update Employee Photo";
-                    if (ofd.ShowDialog() == DialogResult.OK)
-                    {
-                        FileInfo fileInfo = new FileInfo(ofd.FileName);
-                        if (fileInfo.Length > 2 * 1024 * 1024)
-                        {
-                            MessageBox.Show("Image size exceeds 2MB limit.", "Image Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return;
-                        }
-                        using (Image tempImage = Image.FromFile(ofd.FileName))
-                        {
-                            if (tempImage.Width > 2000 || tempImage.Height > 2000)
-                            {
-                                MessageBox.Show("Image dimensions exceed 2000x2000 pixels.", "Image Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                return;
-                            }
-                            pictureEmployee.Image?.Dispose();
-                            pictureEmployee.Image = (Image)tempImage.Clone();
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error updating image: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
+        
 
         #endregion
 
@@ -619,6 +534,7 @@ namespace AgePay
         private GroupBox groupBox3;
         private Button btnEDITphoto;
         private PictureBox pictureEmployee;
+        private ComboBox comboBox_txtDeptID;
         private TextBox txtDepoNo;
     }
 }
