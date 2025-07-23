@@ -1,102 +1,141 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
+using System.Data.SqlClient;
 using System.Drawing;
+using System.Drawing.Printing;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.Json;
 using System.Windows.Forms;
+using AgePay.mainpanel_utils;
 
 namespace AgePay
 {
     public partial class MainPanel : Form
     {
-        // Sidebar animation
         private System.Windows.Forms.Timer panelSlideTimer;
         private bool isPanelExpanded = true;
         private int panelTargetWidth;
         private const int panelCollapsedWidth = 57;
         private const int panelExpandedWidth = 344;
         private const int panelSlideStep = 20;
+        private readonly string connectionString = ConnectToSqlDatabase_MsSQL.connectionString;
+        private readonly string userPrivileges;
 
-        public MainPanel()
+        public MainPanel(string privileges)
         {
+            userPrivileges = privileges;
             InitializeComponent();
+        }
 
-            // Initialize the sidebar animation timer
-            panelSlideTimer = new System.Windows.Forms.Timer();
-            panelSlideTimer.Interval = 10;
-            panelSlideTimer.Tick += PanelSlideTimer_Tick;
+        private bool HasAccess(string formName)
+        {
+            try
+            {
+                var privileges = JsonSerializer.Deserialize<List<string>>(userPrivileges) ?? new List<string>();
+                return privileges.Contains(formName);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            // Set target width and start animation
-            if (isPanelExpanded)
+            if (!HasAccess("frmManualTimeRegister"))
             {
-                panelTargetWidth = panelCollapsedWidth;
-                groupBox1.Visible = false;
-                panel3.Dock = DockStyle.None;
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
-            else
-            {
-                panelTargetWidth = panelExpandedWidth;
-            }
-
-            panelSlideTimer.Start();
-        }
-
-        private void PanelSlideTimer_Tick(object sender, EventArgs e)
-        {
-            if (isPanelExpanded)
-            {
-                // Collapse animation
-                if (panel2.Width > panelTargetWidth)
-                {
-                    panel2.Width -= panelSlideStep;
-                    if (panel2.Width <= panelTargetWidth)
-                    {
-                        panel2.Width = panelTargetWidth;
-                        panelSlideTimer.Stop();
-                        isPanelExpanded = false;
-                    }
-                }
-            }
-            else
-            {
-                // Expand animation
-                if (panel2.Width < panelTargetWidth)
-                {
-                    panel2.Width += panelSlideStep;
-                    if (panel2.Width >= panelTargetWidth)
-                    {
-                        panel2.Width = panelTargetWidth;
-                        panelSlideTimer.Stop();
-                        groupBox1.Visible = true;
-                        panel3.Dock = DockStyle.Top;
-                        isPanelExpanded = true;
-                    }
-                }
-            }
+            frmManualTimeRegister timeRegisterForm = new frmManualTimeRegister();
+            timeRegisterForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            timeRegisterForm.Show();
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
-            // Create and configure the form
+            if (!HasAccess("frmEmployeeProfile"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             frmEmployeeProfile employeeForm = new frmEmployeeProfile();
-            employeeForm.FormClosed += (s, args) => this.Show(); // Show MainPanel when employeeForm closes
-            this.Hide(); // Hide the current form
+            employeeForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
             employeeForm.Show();
         }
 
         private void button3_Click(object sender, EventArgs e)
         {
-            // Create and configure the form
+            if (!HasAccess("frmEditTimeRegister"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             frmEditTimeRegister timeRegisterForm = new frmEditTimeRegister();
-            timeRegisterForm.FormClosed += (s, args) => this.Show(); // Show MainPanel when timeRegisterForm closes
-            this.Hide(); // Hide the current form
+            timeRegisterForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
             timeRegisterForm.Show();
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            if (!HasAccess("frmExportAttendance"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmExportAttendance exportForm = new frmExportAttendance();
+            exportForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            exportForm.Show();
+        }
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            if (!HasAccess("frmEditHoliday"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmEditHoliday timeRegisterForm = new frmEditHoliday();
+            timeRegisterForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            timeRegisterForm.Show();
+        }
+
+        private void btn_import_daily_resisgter_data_from_csv_or_tab_seperated_file_Click(object sender, EventArgs e)
+        {
+            if (!HasAccess("frmImportData"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmImportData importForm = new frmImportData();
+            importForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            importForm.Show();
+        }
+
+        private void btnImportData_Click(object sender, EventArgs e)
+        {
+            if (!HasAccess("frmImportData"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmImportData importForm = new frmImportData();
+            importForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            importForm.Show();
+        }
+
+        private void pictureBox1_Click(object sender, EventArgs e)
+        {
+            // Placeholder for pictureBox1 functionality
         }
 
         private void MainPanel_Load(object sender, EventArgs e)

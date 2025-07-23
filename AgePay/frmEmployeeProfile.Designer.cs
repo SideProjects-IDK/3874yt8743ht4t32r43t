@@ -1,4 +1,6 @@
-﻿namespace AgePay
+﻿using System.Data.SqlClient;
+
+namespace AgePay
 {
     partial class frmEmployeeProfile
     {
@@ -357,7 +359,7 @@
             btnDelete.TabIndex = 2;
             btnDelete.Text = "Delete";
             btnDelete.UseVisualStyleBackColor = true;
-            btnDelete.Click += btnDelete_Click;
+            btnDelete.Click += BtnDelete_Click;
             // 
             // btnOpen
             // 
@@ -416,7 +418,7 @@
             groupBox2.TabIndex = 27;
             groupBox2.TabStop = false;
             groupBox2.Text = "Info";
-            groupBox2.Enter += groupBox2_Enter;
+            //groupBox2.Enter += groupBox2_Enter;
             // 
             // txtDepoNo
             // 
@@ -446,7 +448,7 @@
             btnEDITphoto.TabIndex = 6;
             btnEDITphoto.Text = "Update Image";
             btnEDITphoto.UseVisualStyleBackColor = true;
-            btnEDITphoto.Click += btnEDITphoto_Click_1;
+            btnEDITphoto.Click += BtnEDITphoto_Click;
             // 
             // pictureEmployee
             // 
@@ -456,7 +458,7 @@
             pictureEmployee.Size = new Size(253, 195);
             pictureEmployee.TabIndex = 0;
             pictureEmployee.TabStop = false;
-            pictureEmployee.Click += pictureEmployee_Click;
+            //pictureEmployee.Click += pictureEmployee_Click;
             // 
             // frmEmployeeProfile
             // 
@@ -481,6 +483,102 @@
             ((System.ComponentModel.ISupportInitialize)pictureEmployee).EndInit();
             ResumeLayout(false);
             PerformLayout();
+        }
+
+        private void BtnDelete_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(txtEmployeeID.Text) || !int.TryParse(txtEmployeeID.Text, out int employeeId))
+                {
+                    MessageBox.Show("Please select a valid employee to delete.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                DialogResult result = MessageBox.Show("Are you sure you want to delete this employee?", "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result != DialogResult.Yes)
+                    return;
+
+                connection.Open();
+                string query = "DELETE FROM EmployeeProfile WHERE EmployeeID = @EmployeeID";
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@EmployeeID", employeeId);
+                    int rowsAffected = command.ExecuteNonQuery();
+
+                    if (rowsAffected > 0)
+                    {
+                        MessageBox.Show("Employee deleted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        txtEmployeeID.Text = "";
+                        txtEmployeeName.Text = "";
+                        txtFatherName.Text = "";
+                        txtDesignation.Text = "";
+                        txtDeptID.Text = "";
+                        txtDOB.Text = "";
+                        txtDOA.Text = "";
+                        txtCNIC.Text = "";
+                        txtGSalary.Text = "";
+                        txtDepoNo.Text = "";
+                        txtDutyIn.Text = "";
+                        txtDutyOut.Text = "";
+                        pictureEmployee.Image?.Dispose();
+                        pictureEmployee.Image = null;
+                        SetFormFieldsEnabled(false);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Employee not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+            catch (SqlException ex)
+            {
+                MessageBox.Show($"Database error: {ex.Message}", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (connection.State == System.Data.ConnectionState.Open)
+                    connection.Close();
+            }
+        }
+
+        private void BtnEDITphoto_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    ofd.Filter = "Image Files|*.jpg;*.jpeg;*.png;*.bmp";
+                    ofd.Title = "Update Employee Photo";
+                    if (ofd.ShowDialog() == DialogResult.OK)
+                    {
+                        FileInfo fileInfo = new FileInfo(ofd.FileName);
+                        if (fileInfo.Length > 2 * 1024 * 1024)
+                        {
+                            MessageBox.Show("Image size exceeds 2MB limit.", "Image Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                        using (Image tempImage = Image.FromFile(ofd.FileName))
+                        {
+                            if (tempImage.Width > 2000 || tempImage.Height > 2000)
+                            {
+                                MessageBox.Show("Image dimensions exceed 2000x2000 pixels.", "Image Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                return;
+                            }
+                            pictureEmployee.Image?.Dispose();
+                            pictureEmployee.Image = (Image)tempImage.Clone();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error updating image: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         #endregion

@@ -1,304 +1,519 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using System.Data.SqlClient;
-using System.IO;
-using LumenWorks.Framework.IO.Csv;
+using System.Drawing;
+using System.Windows.Forms;
 
 namespace AgePay
 {
     public partial class frmEditTimeRegister : Form
     {
-        private readonly string connectionString = "Server=192.168.1.197;Database=AgePay;User Id=sa;Password=ilahia;";
+        private readonly SqlConnection connection = ConnectToSqlDatabase_MsSQL.GetConnection();
         private DataTable dataTable;
         private DataRow selectedRow;
+        private int unsavedChangesCount = 0;
+        private Dictionary<string, (TimeSpan? TimeIn, TimeSpan? TimeOut, string LeaveType)> pendingChanges = new Dictionary<string, (TimeSpan?, TimeSpan?, string)>();
 
         public frmEditTimeRegister()
         {
             InitializeComponent();
-            dataGridView1.SelectionChanged += dataGridView1_SelectionChanged;
+            dataGridView1.CellClick += dataGridView1_CellClick;
+            txt_search_date.TextChanged += txt_search_date_TextChanged;
+            btn_update.Text = "No unsaved changes!";
         }
 
         private void frmEditTimeRegister_Load(object sender, EventArgs e)
         {
-            LoadData();
+            try
+            {
+                if (connection.State != ConnectionState.Open)
+                {
+                    connection.Open();
+                }
+                LoadData();
+            }
+            catch (SqlException ex)
+            {
+                MessageBox.Show($"Database error: {ex.Message}", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An unexpected error occurred: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (connection.State == ConnectionState.Open)
+                {
+                    connection.Close();
+                }
+            }
         }
 
-        private void LoadData(string filter = "")
+        private void LoadData(DateTime? filterDate = null)
         {
             try
             {
-                using (SqlConnection conn = new SqlConnection(connectionString))
+                if (connection.State != ConnectionState.Open)
                 {
-                    conn.Open();
-                    string query = string.IsNullOrEmpty(filter)
-                        ? "SELECT TOP 1000 ar.[Date], ar.[EmployeeID], ep.EmployeeName, ar.[TimeIn], ar.[TimeOut], ar.[Leave_Type] FROM [AttendanceRegister] ar LEFT JOIN EmployeeProfile ep ON ar.EmployeeID = ep.EmployeeID"
-                        : $"SELECT ar.[Date], ar.[EmployeeID], ep.EmployeeName, ar.[TimeIn], ar.[TimeOut], ar.[Leave_Type] FROM [AttendanceRegister] ar LEFT JOIN EmployeeProfile ep ON ar.EmployeeID = ep.EmployeeID WHERE {filter}";
-                    using (SqlCommand cmd = new SqlCommand(query, conn))
-                    {
-                        if (!string.IsNullOrEmpty(filter))
-                        {
-                            if (filter.Contains("EmployeeID"))
-                                cmd.Parameters.AddWithValue("@EmployeeID", txtfiltercardno.Text.Trim());
-                            else if (filter.Contains("Date"))
-                                cmd.Parameters.AddWithValue("@Date", txtfilterdate.Text.Trim());
-                        }
-                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
-                        {
-                            dataTable = new DataTable();
-                            da.Fill(dataTable);
-                            dataGridView1.DataSource = dataTable;
-                            dataGridView1.Columns["Date"].HeaderText = "Date";
-                            dataGridView1.Columns["EmployeeID"].HeaderText = "Employee ID";
-                            dataGridView1.Columns["EmployeeName"].HeaderText = "Employee Name";
-                            dataGridView1.Columns["TimeIn"].HeaderText = "Time In";
-                            dataGridView1.Columns["TimeOut"].HeaderText = "Time Out";
-                            dataGridView1.Columns["Leave_Type"].HeaderText = "Leave Type";
-                            dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                            dataGridView1.ReadOnly = true;
+                    connection.Open();
+                }
 
-                            if (dataTable.Rows.Count > 0)
-                            {
-                                dataGridView1.Rows[0].Selected = true;
-                                UpdateSelectedRowDetails(dataTable.Rows[0]);
-                            }
-                            else
-                            {
-                                ClearDetails();
-                            }
+                string query = "SELECT TOP 1000 ar.[Date], ar.[EmployeeID], ep.EmployeeName, ar.[TimeIn], ar.[TimeOut], ar.[Leave_Type] FROM [AttendanceRegister] ar LEFT JOIN EmployeeProfile ep ON ar.EmployeeID = ep.EmployeeID";
+                if (filterDate.HasValue)
+                {
+                    query += " WHERE ar.[Date] = @Date";
+                }
+                using (SqlCommand cmd = new SqlCommand(query, connection))
+                {
+                    if (filterDate.HasValue)
+                    {
+                        cmd.Parameters.AddWithValue("@Date", filterDate.Value.Date);
+                    }
+                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                    {
+                        dataTable = new DataTable();
+                        da.Fill(dataTable);
+                        dataGridView1.DataSource = dataTable;
+                        dataGridView1.Columns["Date"].HeaderText = "Date";
+                        dataGridView1.Columns["EmployeeID"].HeaderText = "Employee ID";
+                        dataGridView1.Columns["EmployeeName"].HeaderText = "Employee Name";
+                        dataGridView1.Columns["TimeIn"].HeaderText = "Time In";
+                        dataGridView1.Columns["TimeOut"].HeaderText = "Time Out";
+                        dataGridView1.Columns["Leave_Type"].HeaderText = "Leave Type";
+                        dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                        dataGridView1.ReadOnly = true;
+
+                        if (dataTable.Rows.Count > 0)
+                        {
+                            dataGridView1.Rows[0].Selected = true;
+                            selectedRow = dataTable.Rows[0];
+                        }
+                        else
+                        {
+                            selectedRow = null;
                         }
                     }
                 }
             }
             catch (SqlException ex)
             {
-                MessageBox.Show($"Database error: {ex.Message}\nError Number: {ex.Number}\nEnsure the server is running at 192.168.1.197 and credentials are correct.", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Database error: {ex.Message}", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"An unexpected error occurred: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-        }
-
-        private void dataGridView1_SelectionChanged(object sender, EventArgs e)
-        {
-            if (dataGridView1.SelectedRows.Count > 0)
+            finally
             {
-                int rowIndex = dataGridView1.SelectedRows[0].Index;
-                selectedRow = dataTable.Rows[rowIndex];
-                UpdateSelectedRowDetails(selectedRow);
-            }
-            else
-            {
-                ClearDetails();
+                if (connection.State == ConnectionState.Open)
+                {
+                    connection.Close();
+                }
             }
         }
 
-        private void UpdateSelectedRowDetails(DataRow row)
+        private void txt_search_date_TextChanged(object sender, EventArgs e)
         {
-            txt_cardno.Text = row["EmployeeID"]?.ToString() ?? "";
-            txt_usersname.Text = row["EmployeeName"]?.ToString() ?? "";
-            txt_timein.Text = row["TimeIn"]?.ToString() ?? "";
-            txt_timeout.Text = row["TimeOut"]?.ToString() ?? "";
-            label5.Text = row["Date"] != DBNull.Value ? ((DateTime)row["Date"]).ToString("yyyy-MM-dd") : "";
-            LoadUserImage(Convert.ToInt32(row["EmployeeID"]));
-        }
-
-        private void ClearDetails()
-        {
-            txt_cardno.Text = "";
-            txt_usersname.Text = "";
-            txt_timein.Text = "";
-            txt_timeout.Text = "";
-            label5.Text = "";
-            pictureBox_usersimage.Image = null;
-            selectedRow = null;
-        }
-
-        private void pictureBox_usersimage_Click(object sender, EventArgs e)
-        {
-            if (selectedRow != null)
+            string dateText = txt_search_date.Text.Trim();
+            if (string.IsNullOrEmpty(dateText))
             {
-                int employeeId = Convert.ToInt32(selectedRow["EmployeeID"]);
-                ShowEmployeeProfile(employeeId);
-            }
-        }
-
-        private void btn_update_record_Click(object sender, EventArgs e)
-        {
-            if (selectedRow == null)
-            {
-                MessageBox.Show("Please select a record to update.", "No Record Selected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txt_search_date.ForeColor = Color.Black;
+                LoadData();
                 return;
             }
 
-            using (Form updateForm = new Form
+            if (DateTime.TryParse(dateText, out DateTime parsedDate))
             {
-                Size = new Size(300, 200),
-                Text = "Update Attendance",
-                StartPosition = FormStartPosition.CenterParent,
-                BackColor = Color.FromArgb(240, 240, 240)
-            })
+                txt_search_date.ForeColor = Color.Black;
+                LoadData(parsedDate);
+            }
+            else
             {
-                Label lblTimeIn = new Label { Text = "Time In:", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                TextBox txtTimeIn = new TextBox { Text = txt_timein.Text, Location = new Point(100, 20), Width = 150, Font = new Font("Segoe UI", 9) };
-
-                Label lblTimeOut = new Label { Text = "Time Out:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                TextBox txtTimeOut = new TextBox { Text = txt_timeout.Text, Location = new Point(100, 50), Width = 150, Font = new Font("Segoe UI", 9) };
-
-                Label lblLeaveType = new Label { Text = "Leave Type:", Location = new Point(20, 80), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                ComboBox cmbLeaveType = new ComboBox
-                {
-                    Location = new Point(100, 80),
-                    Width = 150,
-                    Font = new Font("Segoe UI", 9),
-                    DropDownStyle = ComboBoxStyle.DropDownList
-                };
-                cmbLeaveType.Items.AddRange(new object[] { "", "C", "A", "S" });
-                cmbLeaveType.SelectedItem = selectedRow["Leave_Type"] != DBNull.Value ? selectedRow["Leave_Type"].ToString() : "";
-
-                Button btnSave = new Button { Text = "Save", Location = new Point(100, 130), Size = new Size(75, 30), Font = new Font("Segoe UI", 10), BackColor = Color.FromArgb(40, 167, 69), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, DialogResult = DialogResult.OK };
-                Button btnCancel = new Button { Text = "Cancel", Location = new Point(180, 130), Size = new Size(75, 30), Font = new Font("Segoe UI", 10), BackColor = Color.FromArgb(108, 117, 125), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, DialogResult = DialogResult.Cancel };
-
-                updateForm.Controls.AddRange(new Control[] { lblTimeIn, txtTimeIn, lblTimeOut, txtTimeOut, lblLeaveType, cmbLeaveType, btnSave, btnCancel });
-
-                btnSave.Click += (s, ev) =>
-                {
-                    string leaveType = cmbLeaveType.SelectedItem?.ToString();
-                    if (!string.IsNullOrEmpty(leaveType) && !new[] { "C", "A", "S" }.Contains(leaveType))
-                    {
-                        MessageBox.Show("Leave Type must be 'C', 'A', or 'S'.", "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        updateForm.DialogResult = DialogResult.None;
-                        return;
-                    }
-
-                    if (updateForm.DialogResult == DialogResult.OK)
-                    {
-                        try
-                        {
-                            using (SqlConnection conn = new SqlConnection(connectionString))
-                            {
-                                conn.Open();
-                                string updateQuery = @"
-                                    UPDATE [AttendanceRegister]
-                                    SET [TimeIn] = @TimeIn, [TimeOut] = @TimeOut, [Leave_Type] = @Leave_Type
-                                    WHERE [Date] = @Date AND [EmployeeID] = @EmployeeID";
-                                using (SqlCommand cmd = new SqlCommand(updateQuery, conn))
-                                {
-                                    cmd.Parameters.AddWithValue("@Date", selectedRow["Date"]);
-                                    cmd.Parameters.AddWithValue("@EmployeeID", selectedRow["EmployeeID"]);
-                                    cmd.Parameters.AddWithValue("@TimeIn", string.IsNullOrWhiteSpace(txtTimeIn.Text) ? (object)DBNull.Value : txtTimeIn.Text);
-                                    cmd.Parameters.AddWithValue("@TimeOut", string.IsNullOrWhiteSpace(txtTimeOut.Text) ? (object)DBNull.Value : txtTimeOut.Text);
-                                    cmd.Parameters.AddWithValue("@Leave_Type", string.IsNullOrEmpty(leaveType) ? (object)DBNull.Value : leaveType);
-                                    cmd.ExecuteNonQuery();
-                                }
-                            }
-                            MessageBox.Show("Attendance record updated successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            LoadData();
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show($"Error updating record: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
-                    }
-                };
-
-                updateForm.ShowDialog();
+                txt_search_date.ForeColor = Color.Red;
+                dataGridView1.DataSource = null;
             }
         }
 
-        private void txt_cardno_TextChanged(object sender, EventArgs e)
+        private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
         {
-            // Display-only; updated by selection
-        }
-
-        private void txt_timein_TextChanged(object sender, EventArgs e)
-        {
-            // Display-only; updated by selection
-        }
-
-        private void txt_timeout_TextChanged(object sender, EventArgs e)
-        {
-            // Display-only; updated by selection
-        }
-
-        private void txt_usersname_TextChanged(object sender, EventArgs e)
-        {
-            // Display-only; updated by selection
-        }
-
-        private void txtfilterdate_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Enter)
+            if (e.RowIndex >= 0)
             {
-                string date = txtfilterdate.Text.Trim();
-                if (!string.IsNullOrEmpty(date))
-                {
-                    LoadData("CONVERT(VARCHAR, ar.[Date], 23) LIKE @Date");
-                }
-                else
-                {
-                    LoadData();
-                }
-                e.Handled = true;
-                e.SuppressKeyPress = true;
+                selectedRow = dataTable.Rows[e.RowIndex];
+                int employeeId = Convert.ToInt32(selectedRow["EmployeeID"]);
+                string employeeName = selectedRow["EmployeeName"]?.ToString() ?? "N/A";
+                TimeSpan? timeIn = selectedRow["TimeIn"] != DBNull.Value ? (TimeSpan?)TimeSpan.Parse(selectedRow["TimeIn"].ToString()) : null;
+                TimeSpan? timeOut = selectedRow["TimeOut"] != DBNull.Value ? (TimeSpan?)TimeSpan.Parse(selectedRow["TimeOut"].ToString()) : null;
+                string leaveType = selectedRow["Leave_Type"]?.ToString()?.Trim() ?? "";
+                DateTime date = (DateTime)selectedRow["Date"];
+                ShowEditAttendanceForm(employeeId, employeeName, date, timeIn, timeOut, leaveType);
             }
         }
 
-        private void txtfiltercardno_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Enter)
-            {
-                string cardNo = txtfiltercardno.Text.Trim();
-                if (!string.IsNullOrEmpty(cardNo))
-                {
-                    LoadData("ar.[EmployeeID] LIKE @EmployeeID");
-                }
-                else
-                {
-                    LoadData();
-                }
-                e.Handled = true;
-                e.SuppressKeyPress = true;
-            }
-        }
-
-        private void label5_Click(object sender, EventArgs e)
-        {
-            // Display-only; updated by selection
-        }
-
-        private void LoadUserImage(int employeeId)
+        private void ShowEditAttendanceForm(int employeeId, string employeeName, DateTime date, TimeSpan? timeIn, TimeSpan? timeOut, string leaveType)
         {
             try
             {
-                using (SqlConnection conn = new SqlConnection(connectionString))
+                if (connection.State != ConnectionState.Open)
                 {
-                    conn.Open();
-                    string query = "SELECT EmployeeImage FROM EmployeeProfile WHERE EmployeeID = @EmployeeID";
-                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    connection.Open();
+                }
+                using (EditAttendanceForm editForm = new EditAttendanceForm(employeeId, employeeName, date, timeIn, timeOut, leaveType, connection))
+                {
+                    if (editForm.ShowDialog() == DialogResult.OK)
                     {
-                        cmd.Parameters.AddWithValue("@EmployeeID", employeeId);
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        string key = $"{date:yyyy-MM-dd}_{employeeId}";
+                        if (!pendingChanges.ContainsKey(key) ||
+                            pendingChanges[key].TimeIn != editForm.TimeIn ||
+                            pendingChanges[key].TimeOut != editForm.TimeOut ||
+                            pendingChanges[key].LeaveType != editForm.LeaveType)
                         {
-                            if (reader.Read() && reader["EmployeeImage"] != DBNull.Value)
+                            pendingChanges[key] = (editForm.TimeIn, editForm.TimeOut, editForm.LeaveType);
+                            unsavedChangesCount++;
+                            btn_update.Text = $"Unsaved changes {unsavedChangesCount}";
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening edit form: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (connection.State == ConnectionState.Open)
+                {
+                    connection.Close();
+                }
+            }
+        }
+
+        private void btn_update_Click(object sender, EventArgs e)
+        {
+            if (unsavedChangesCount == 0)
+            {
+                MessageBox.Show("No changes to save.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            DialogResult result = MessageBox.Show($"Are you sure you want to save {unsavedChangesCount} change(s)?", "Confirm Save", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result != DialogResult.Yes)
+                return;
+
+            try
+            {
+                if (connection.State != ConnectionState.Open)
+                {
+                    connection.Open();
+                }
+
+                foreach (var change in pendingChanges)
+                {
+                    var parts = change.Key.Split('_');
+                    if (parts.Length != 2 || !DateTime.TryParse(parts[0], out DateTime date) || !int.TryParse(parts[1], out int employeeId))
+                    {
+                        MessageBox.Show($"Invalid key format: {change.Key}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        continue;
+                    }
+
+                    // Check if the record exists
+                    string checkQuery = "SELECT COUNT(*) FROM [AttendanceRegister] WHERE [Date] = @Date AND [EmployeeID] = @EmployeeID";
+                    using (SqlCommand checkCmd = new SqlCommand(checkQuery, connection))
+                    {
+                        checkCmd.Parameters.AddWithValue("@Date", date);
+                        checkCmd.Parameters.AddWithValue("@EmployeeID", employeeId);
+                        int count = (int)checkCmd.ExecuteScalar();
+
+                        if (count > 0)
+                        {
+                            // Update existing record
+                            string updateQuery = @"
+                                UPDATE [AttendanceRegister]
+                                SET [TimeIn] = @TimeIn, [TimeOut] = @TimeOut, [Leave_Type] = @Leave_Type
+                                WHERE [Date] = @Date AND [EmployeeID] = @EmployeeID";
+                            using (SqlCommand cmd = new SqlCommand(updateQuery, connection))
                             {
-                                byte[] imageData = (byte[])reader["EmployeeImage"];
-                                using (MemoryStream ms = new MemoryStream(imageData))
-                                {
-                                    pictureBox_usersimage.Image = Image.FromStream(ms);
-                                }
+                                cmd.Parameters.AddWithValue("@Date", date);
+                                cmd.Parameters.AddWithValue("@EmployeeID", employeeId);
+                                cmd.Parameters.Add("@TimeIn", SqlDbType.Time).Value = change.Value.TimeIn.HasValue ? change.Value.TimeIn.Value : DBNull.Value;
+                                cmd.Parameters.Add("@TimeOut", SqlDbType.Time).Value = change.Value.TimeOut.HasValue ? change.Value.TimeOut.Value : DBNull.Value;
+                                cmd.Parameters.Add("@Leave_Type", SqlDbType.Char, 1).Value = string.IsNullOrWhiteSpace(change.Value.LeaveType) ? DBNull.Value : change.Value.LeaveType;
+                                cmd.ExecuteNonQuery();
                             }
-                            else
+                        }
+                        else
+                        {
+                            // Insert new record
+                            string insertQuery = @"
+                                INSERT INTO [AttendanceRegister] ([Date], [EmployeeID], [TimeIn], [TimeOut], [Leave_Type])
+                                VALUES (@Date, @EmployeeID, @TimeIn, @TimeOut, @Leave_Type)";
+                            using (SqlCommand cmd = new SqlCommand(insertQuery, connection))
                             {
-                                pictureBox_usersimage.Image = null;
+                                cmd.Parameters.AddWithValue("@Date", date);
+                                cmd.Parameters.AddWithValue("@EmployeeID", employeeId);
+                                cmd.Parameters.Add("@TimeIn", SqlDbType.Time).Value = change.Value.TimeIn.HasValue ? change.Value.TimeIn.Value : DBNull.Value;
+                                cmd.Parameters.Add("@TimeOut", SqlDbType.Time).Value = change.Value.TimeOut.HasValue ? change.Value.TimeOut.Value : DBNull.Value;
+                                cmd.Parameters.Add("@Leave_Type", SqlDbType.Char, 1).Value = string.IsNullOrWhiteSpace(change.Value.LeaveType) ? DBNull.Value : change.Value.LeaveType;
+                                cmd.ExecuteNonQuery();
                             }
+                        }
+                    }
+                }
+                MessageBox.Show("Changes saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                unsavedChangesCount = 0;
+                pendingChanges.Clear();
+                btn_update.Text = "No unsaved changes!";
+                LoadData();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error saving changes: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (connection.State == ConnectionState.Open)
+                {
+                    connection.Close();
+                }
+            }
+        }
+    }
+
+    public class EditAttendanceForm : Form
+    {
+        private readonly int employeeId;
+        private readonly string employeeName;
+        private readonly DateTime date;
+        private readonly SqlConnection connection;
+        private TextBox txtTimeIn;
+        private TextBox txtTimeOut;
+        private ComboBox cmbLeaveType;
+        private PictureBox pictureBox;
+        private Label lblHoliday;
+        public TimeSpan? TimeIn => string.IsNullOrWhiteSpace(txtTimeIn.Text) ? null : TimeSpan.TryParse(txtTimeIn.Text, out TimeSpan time) ? time : null;
+        public TimeSpan? TimeOut => string.IsNullOrWhiteSpace(txtTimeOut.Text) ? null : TimeSpan.TryParse(txtTimeOut.Text, out TimeSpan time) ? time : null;
+        public string LeaveType => cmbLeaveType.SelectedItem?.ToString()?.Split('-')[0].Trim() ?? "";
+
+        public EditAttendanceForm(int employeeId, string employeeName, DateTime date, TimeSpan? timeIn, TimeSpan? timeOut, string leaveType, SqlConnection connection)
+        {
+            this.employeeId = employeeId;
+            this.employeeName = employeeName;
+            this.date = date;
+            this.connection = connection;
+            InitializeComponents(timeIn, timeOut, leaveType);
+        }
+
+        private void InitializeComponents(TimeSpan? timeIn, TimeSpan? timeOut, string leaveType)
+        {
+            this.Size = new Size(450, 500);
+            this.Text = "Edit Attendance Record";
+            this.StartPosition = FormStartPosition.CenterParent;
+            this.BackColor = Color.FromArgb(240, 240, 240);
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+
+            Label lblEmployeeID = new Label
+            {
+                Text = $"Employee ID: {employeeId}",
+                Location = new Point(20, 20),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+            };
+
+            Label lblEmployeeName = new Label
+            {
+                Text = $"Name: {employeeName}",
+                Location = new Point(20, 50),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+            };
+
+            Label lblDate = new Label
+            {
+                Text = $"Date: {date:yyyy-MM-dd}",
+                Location = new Point(20, 80),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+            };
+
+            lblHoliday = new Label
+            {
+                Text = "Holiday: None",
+                Location = new Point(20, 110),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9, FontStyle.Italic),
+                ForeColor = Color.DarkRed
+            };
+
+            pictureBox = new PictureBox
+            {
+                Location = new Point(20, 140),
+                Size = new Size(150, 150),
+                SizeMode = PictureBoxSizeMode.StretchImage,
+                BorderStyle = BorderStyle.Fixed3D,
+                BackColor = Color.White
+            };
+            pictureBox.Click += PictureBox_Click;
+
+            Label lblTimeIn = new Label
+            {
+                Text = "Time In (HH:mm:ss):",
+                Location = new Point(20, 300),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9)
+            };
+
+            txtTimeIn = new TextBox
+            {
+                Text = timeIn?.ToString(@"hh\:mm\:ss") ?? "",
+                Location = new Point(150, 300),
+                Width = 200,
+                Font = new Font("Segoe UI", 9)
+            };
+
+            Label lblTimeOut = new Label
+            {
+                Text = "Time Out (HH:mm:ss):",
+                Location = new Point(20, 330),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9)
+            };
+
+            txtTimeOut = new TextBox
+            {
+                Text = timeOut?.ToString(@"hh\:mm\:ss") ?? "",
+                Location = new Point(150, 330),
+                Width = 200,
+                Font = new Font("Segoe UI", 9)
+            };
+
+            Label lblLeaveType = new Label
+            {
+                Text = "Leave Type:",
+                Location = new Point(20, 360),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9)
+            };
+
+            cmbLeaveType = new ComboBox
+            {
+                Location = new Point(150, 360),
+                Width = 200,
+                Font = new Font("Segoe UI", 9),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbLeaveType.Items.AddRange(new object[] { "", "C - Casual", "A - Annual", "S - Sick" });
+            cmbLeaveType.SelectedItem = leaveType switch
+            {
+                "C" => "C - Casual",
+                "A" => "A - Annual",
+                "S" => "S - Sick",
+                _ => ""
+            };
+
+            Button btnSave = new Button
+            {
+                Text = "Save",
+                Location = new Point(150, 400),
+                Size = new Size(100, 30),
+                Font = new Font("Segoe UI", 10),
+                BackColor = Color.FromArgb(40, 167, 69),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                DialogResult = DialogResult.OK
+            };
+
+            Button btnCancel = new Button
+            {
+                Text = "Cancel",
+                Location = new Point(260, 400),
+                Size = new Size(100, 30),
+                Font = new Font("Segoe UI", 10),
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                DialogResult = DialogResult.Cancel
+            };
+
+            btnSave.Click += (s, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(txtTimeIn.Text) && !TimeSpan.TryParseExact(txtTimeIn.Text, @"hh\:mm\:ss", null, out _))
+                {
+                    MessageBox.Show("Time In must be a valid time (HH:mm:ss).", "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    this.DialogResult = DialogResult.None;
+                    return;
+                }
+                if (!string.IsNullOrWhiteSpace(txtTimeOut.Text) && !TimeSpan.TryParseExact(txtTimeOut.Text, @"hh\:mm\:ss", null, out _))
+                {
+                    MessageBox.Show("Time Out must be a valid time (HH:mm:ss).", "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    this.DialogResult = DialogResult.None;
+                    return;
+                }
+                string selectedLeaveType = cmbLeaveType.SelectedItem?.ToString()?.Split('-')[0].Trim() ?? "";
+                if (!string.IsNullOrEmpty(selectedLeaveType) && !new[] { "C", "A", "S" }.Contains(selectedLeaveType))
+                {
+                    MessageBox.Show("Leave Type must be 'C', 'A', 'S', or empty.", "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    this.DialogResult = DialogResult.None;
+                    return;
+                }
+
+                DialogResult result = MessageBox.Show("Are you sure you want to save changes?", "Confirm Save", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result != DialogResult.Yes)
+                {
+                    this.DialogResult = DialogResult.None;
+                }
+            };
+
+            try
+            {
+                if (connection.State != ConnectionState.Open)
+                {
+                    connection.Open();
+                }
+                LoadEmployeeImage();
+                LoadHolidayInfo();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error initializing form: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (connection.State == ConnectionState.Open)
+                {
+                    connection.Close();
+                }
+            }
+
+            this.Controls.AddRange(new Control[] { lblEmployeeID, lblEmployeeName, lblDate, lblHoliday, pictureBox, lblTimeIn, txtTimeIn, lblTimeOut, txtTimeOut, lblLeaveType, cmbLeaveType, btnSave, btnCancel });
+        }
+
+        private void LoadEmployeeImage()
+        {
+            try
+            {
+                if (connection.State != ConnectionState.Open)
+                {
+                    connection.Open();
+                }
+                string query = "SELECT EmployeeImage FROM EmployeeProfile WHERE EmployeeID = @EmployeeID";
+                using (SqlCommand cmd = new SqlCommand(query, connection))
+                {
+                    cmd.Parameters.AddWithValue("@EmployeeID", employeeId);
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read() && reader["EmployeeImage"] != DBNull.Value)
+                        {
+                            byte[] imageData = (byte[])reader["EmployeeImage"];
+                            using (System.IO.MemoryStream ms = new System.IO.MemoryStream(imageData))
+                            {
+                                pictureBox.Image = Image.FromStream(ms);
+                            }
+                        }
+                        else
+                        {
+                            pictureBox.Image = null;
                         }
                     }
                 }
@@ -307,219 +522,145 @@ namespace AgePay
             {
                 MessageBox.Show($"Error loading image: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+            finally
+            {
+                if (connection.State == ConnectionState.Open)
+                {
+                    connection.Close();
+                }
+            }
         }
 
-        private void ShowEmployeeProfile(int employeeId)
+        private void LoadHolidayInfo()
         {
             try
             {
-                using (SqlConnection conn = new SqlConnection(connectionString))
+                if (connection.State != ConnectionState.Open)
                 {
-                    conn.Open();
-                    string query = "SELECT EmployeeID, EmployeeName, FatherName, Designation, DeptID, DOB, DOA, CNIC, GSalary, DOR, Address, DutyIn, DutyOut, EmployeeImage FROM EmployeeProfile WHERE EmployeeID = @EmployeeID";
-                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    connection.Open();
+                }
+                string query = "SELECT HolidayDetail FROM Holidays WHERE [Date] = @Date";
+                using (SqlCommand cmd = new SqlCommand(query, connection))
+                {
+                    cmd.Parameters.AddWithValue("@Date", date);
+                    object result = cmd.ExecuteScalar();
+                    lblHoliday.Text = result != null ? $"Holiday: {result}" : "Holiday: None";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading holiday info: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (connection.State == ConnectionState.Open)
+                {
+                    connection.Close();
+                }
+            }
+        }
+
+        private void PictureBox_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (connection.State != ConnectionState.Open)
+                {
+                    connection.Open();
+                }
+                using (Form profileForm = new Form
+                {
+                    Size = new Size(400, 600),
+                    Text = "Employee Profile",
+                    StartPosition = FormStartPosition.CenterParent,
+                    BackColor = Color.FromArgb(240, 240, 240),
+                    FormBorderStyle = FormBorderStyle.FixedDialog,
+                    MaximizeBox = false,
+                    MinimizeBox = false
+                })
+                {
+                    PictureBox profilePicture = new PictureBox
+                    {
+                        Location = new Point(20, 20),
+                        Size = new Size(150, 150),
+                        SizeMode = PictureBoxSizeMode.StretchImage,
+                        BorderStyle = BorderStyle.Fixed3D
+                    };
+
+                    int yOffset = 20;
+                    Label[] labels = new Label[10];
+                    string query = "SELECT EmployeeName, FatherName, Designation, DeptID, DOB, DOA, CNIC, GrossSalary, Address, DutyIn, DutyOut FROM EmployeeProfile WHERE EmployeeID = @EmployeeID";
+                    using (SqlCommand cmd = new SqlCommand(query, connection))
                     {
                         cmd.Parameters.AddWithValue("@EmployeeID", employeeId);
                         using (SqlDataReader reader = cmd.ExecuteReader())
                         {
                             if (reader.Read())
                             {
-                                Form popup = new Form
-                                {
-                                    Size = new Size(400, 600),
-                                    Text = "Employee Details",
-                                    StartPosition = FormStartPosition.CenterParent,
-                                    BackColor = Color.FromArgb(240, 240, 240)
-                                };
-
-                                PictureBox pictureBox = new PictureBox
-                                {
-                                    Location = new Point(10, 10),
-                                    Size = new Size(150, 150),
-                                    SizeMode = PictureBoxSizeMode.StretchImage,
-                                    BorderStyle = BorderStyle.FixedSingle
-                                };
                                 if (reader["EmployeeImage"] != DBNull.Value)
                                 {
                                     byte[] imageData = (byte[])reader["EmployeeImage"];
-                                    using (MemoryStream ms = new MemoryStream(imageData))
+                                    using (System.IO.MemoryStream ms = new System.IO.MemoryStream(imageData))
                                     {
-                                        pictureBox.Image = Image.FromStream(ms);
+                                        profilePicture.Image = Image.FromStream(ms);
                                     }
                                 }
 
-                                int yOffset = 10;
-                                Label lblName = new Label { Text = $"Name: {(reader["EmployeeName"] ?? "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblFatherName = new Label { Text = $"Father's Name: {(reader["FatherName"] ?? "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblCNIC = new Label { Text = $"CNIC: {(reader["CNIC"] ?? "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblDesignation = new Label { Text = $"Designation: {(reader["Designation"] ?? "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblDeptID = new Label { Text = $"Department ID: {(reader["DeptID"] ?? "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblDOB = new Label { Text = $"DOB: {(reader["DOB"] != DBNull.Value ? ((DateTime)reader["DOB"]).ToString("yyyy-MM-dd") : "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblDOA = new Label { Text = $"DOA: {(reader["DOA"] != DBNull.Value ? ((DateTime)reader["DOA"]).ToString("yyyy-MM-dd") : "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblDOR = new Label { Text = $"DOR: {(reader["DOR"] != DBNull.Value ? ((DateTime)reader["DOR"]).ToString("yyyy-MM-dd") : "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblGSalary = new Label { Text = $"Gross Salary: {(reader["GSalary"] != DBNull.Value ? ((decimal)reader["GSalary"]).ToString("F2") : "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblAddress = new Label { Text = $"Address: {(reader["Address"] ?? "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblDutyIn = new Label { Text = $"Duty In: {(reader["DutyIn"] ?? "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-                                yOffset += 20;
-                                Label lblDutyOut = new Label { Text = $"Duty Out: {(reader["DutyOut"] ?? "N/A")}", Location = new Point(170, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
-
-                                Button btnClose = new Button { Text = "Close", Location = new Point(150, 400), Size = new Size(100, 30), Font = new Font("Segoe UI", 10), BackColor = Color.FromArgb(108, 117, 125), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, DialogResult = DialogResult.OK };
-
-                                popup.Controls.AddRange(new Control[] { pictureBox, lblName, lblFatherName, lblCNIC, lblDesignation, lblDeptID, lblDOB, lblDOA, lblDOR, lblGSalary, lblAddress, lblDutyIn, lblDutyOut, btnClose });
-                                popup.ShowDialog();
+                                labels[0] = new Label { Text = $"Name: {reader["EmployeeName"] ?? "N/A"}", Location = new Point(180, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
+                                yOffset += 30;
+                                labels[1] = new Label { Text = $"Father's Name: {reader["FatherName"] ?? "N/A"}", Location = new Point(180, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
+                                yOffset += 30;
+                                labels[2] = new Label { Text = $"Designation: {reader["Designation"] ?? "N/A"}", Location = new Point(180, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
+                                yOffset += 30;
+                                labels[3] = new Label { Text = $"Department ID: {reader["DeptID"] ?? "N/A"}", Location = new Point(180, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
+                                yOffset += 30;
+                                labels[4] = new Label { Text = $"DOB: {(reader["DOB"] != DBNull.Value ? Convert.ToDateTime(reader["DOB"]).ToString("yyyy-MM-dd") : "N/A")}", Location = new Point(180, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
+                                yOffset += 30;
+                                labels[5] = new Label { Text = $"DOA: {(reader["DOA"] != DBNull.Value ? Convert.ToDateTime(reader["DOA"]).ToString("yyyy-MM-dd") : "N/A")}", Location = new Point(180, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
+                                yOffset += 30;
+                                labels[6] = new Label { Text = $"CNIC: {reader["CNIC"] ?? "N/A"}", Location = new Point(180, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
+                                yOffset += 30;
+                                labels[7] = new Label { Text = $"Gross Salary: {(reader["GrossSalary"] != DBNull.Value ? Convert.ToDecimal(reader["GrossSalary"]).ToString("F2") : "N/A")}", Location = new Point(180, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
+                                yOffset += 30;
+                                labels[8] = new Label { Text = $"Address: {reader["Address"] ?? "N/A"}", Location = new Point(180, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
+                                yOffset += 30;
+                                labels[9] = new Label { Text = $"Duty Hours: {(reader["DutyIn"] != DBNull.Value && reader["DutyOut"] != DBNull.Value ? $"{reader["DutyIn"]} - {reader["DutyOut"]}" : "N/A")}", Location = new Point(180, yOffset), AutoSize = true, Font = new Font("Segoe UI", 9) };
                             }
                             else
                             {
-                                MessageBox.Show("No profile found for this employee.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                MessageBox.Show("Employee profile not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                return;
                             }
                         }
                     }
+
+                    Button btnClose = new Button
+                    {
+                        Text = "Close",
+                        Location = new Point(150, yOffset + 50),
+                        Size = new Size(100, 30),
+                        Font = new Font("Segoe UI", 10),
+                        BackColor = Color.FromArgb(108, 117, 125),
+                        ForeColor = Color.White,
+                        FlatStyle = FlatStyle.Flat,
+                        DialogResult = DialogResult.OK
+                    };
+
+                    profileForm.Controls.AddRange(new Control[] { profilePicture, btnClose });
+                    profileForm.Controls.AddRange(labels);
+                    profileForm.ShowDialog();
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error loading profile: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-        }
-
-        private void btn_import_data_csv_Click(object sender, EventArgs e)
-        {
-            ImportFile("CSV files (*.csv)|*.csv", ',');
-        }
-
-        private void btn_load_data_from_csv_Click(object sender, EventArgs e)
-        {
-            ImportFile("CSV files (*.csv)|*.csv", ',');
-        }
-
-        private void btn_load_data_from_tab_separated_file_Click(object sender, EventArgs e)
-        {
-            ImportFile("TSV files (*.tsv)|*.tsv", '\t');
-        }
-
-        private void ImportFile(string filter, char delimiter)
-        {
-            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            finally
             {
-                openFileDialog.Filter = filter;
-                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                if (connection.State == ConnectionState.Open)
                 {
-                    DataTable csvData = new DataTable();
-                    try
-                    {
-                        using (var stream = File.OpenRead(openFileDialog.FileName))
-                        using (var reader = new StreamReader(stream))
-                        {
-                            using (var csv = new CsvReader(reader, true, delimiter))
-                            {
-                                csvData.Load(csv);
-                            }
-                        }
-
-                        using (Form confirmationForm = new Form())
-                        {
-                            confirmationForm.Text = $"Confirm {Path.GetExtension(openFileDialog.FileName).ToUpper().TrimStart('.')} Import";
-                            confirmationForm.Size = new Size(600, 400);
-                            confirmationForm.StartPosition = FormStartPosition.CenterParent;
-                            confirmationForm.BackColor = Color.FromArgb(240, 240, 240);
-
-                            DataGridView previewGrid = new DataGridView
-                            {
-                                Dock = DockStyle.Fill,
-                                DataSource = csvData,
-                                Font = new Font("Segoe UI", 9),
-                                BackgroundColor = Color.White,
-                                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
-                            };
-
-                            Button btnConfirm = new Button
-                            {
-                                Text = "Import",
-                                Location = new Point(250, 350),
-                                Size = new Size(100, 30),
-                                Font = new Font("Segoe UI", 10),
-                                BackColor = Color.FromArgb(40, 167, 69),
-                                ForeColor = Color.White,
-                                FlatStyle = FlatStyle.Flat,
-                                DialogResult = DialogResult.OK
-                            };
-                            Button btnCancel = new Button
-                            {
-                                Text = "Cancel",
-                                Location = new Point(360, 350),
-                                Size = new Size(100, 30),
-                                Font = new Font("Segoe UI", 10),
-                                BackColor = Color.FromArgb(108, 117, 125),
-                                ForeColor = Color.White,
-                                FlatStyle = FlatStyle.Flat,
-                                DialogResult = DialogResult.Cancel
-                            };
-
-                            confirmationForm.Controls.AddRange(new Control[] { previewGrid, btnConfirm, btnCancel });
-
-                            if (confirmationForm.ShowDialog() == DialogResult.OK)
-                            {
-                                foreach (DataRow row in csvData.Rows)
-                                {
-                                    string leaveType = row["Leave_Type"]?.ToString();
-                                    if (!string.IsNullOrEmpty(leaveType) && !new[] { "C", "A", "S" }.Contains(leaveType))
-                                    {
-                                        MessageBox.Show($"Invalid Leave Type '{leaveType}' in file. Leave Type must be 'C', 'A', or 'S'.", "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                        return;
-                                    }
-                                }
-                                ImportToDatabase(csvData);
-                                MessageBox.Show($"{Path.GetExtension(openFileDialog.FileName).ToUpper().TrimStart('.')} data imported successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                                LoadData();
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Error reading file: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
+                    connection.Close();
                 }
-            }
-        }
-
-        private void ImportToDatabase(DataTable data)
-        {
-            try
-            {
-                using (SqlConnection conn = new SqlConnection(connectionString))
-                {
-                    conn.Open();
-                    foreach (DataRow row in data.Rows)
-                    {
-                        string insertQuery = @"
-                            INSERT INTO [AttendanceRegister] ([Date], [EmployeeID], [TimeIn], [TimeOut], [Leave_Type])
-                            VALUES (@Date, @EmployeeID, @TimeIn, @TimeOut, @Leave_Type)";
-                        using (SqlCommand cmd = new SqlCommand(insertQuery, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@Date", row["Date"] != DBNull.Value ? (DateTime)row["Date"] : DBNull.Value);
-                            cmd.Parameters.AddWithValue("@EmployeeID", row["EmployeeID"] != DBNull.Value ? Convert.ToInt32(row["EmployeeID"]) : DBNull.Value);
-                            cmd.Parameters.AddWithValue("@TimeIn", row["TimeIn"] != DBNull.Value ? row["TimeIn"].ToString() : DBNull.Value);
-                            cmd.Parameters.AddWithValue("@TimeOut", row["TimeOut"] != DBNull.Value ? row["TimeOut"].ToString() : DBNull.Value);
-                            string leaveType = row["Leave_Type"] != DBNull.Value ? row["Leave_Type"].ToString() : null;
-                            cmd.Parameters.AddWithValue("@Leave_Type", string.IsNullOrEmpty(leaveType) ? (object)DBNull.Value : leaveType);
-                            cmd.ExecuteNonQuery();
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error importing data: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
