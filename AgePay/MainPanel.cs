@@ -142,5 +142,88 @@ namespace AgePay
         {
             // Optional: run logic on form load
         }
+
+        private void editDailyRegsiterToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!HasAccess("frmEditTimeRegister"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmEditTimeRegister timeRegisterForm = new frmEditTimeRegister();
+            timeRegisterForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            timeRegisterForm.Show();
+        }
+
+        private void manualAttendanceToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!HasAccess("frmManualTimeRegister"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmManualTimeRegister timeRegisterForm = new frmManualTimeRegister();
+            timeRegisterForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            timeRegisterForm.Show();
+        }
+
+        private void yearlyHolidaysToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!HasAccess("frmEditHoliday"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmEditHoliday timeRegisterForm = new frmEditHoliday();
+            timeRegisterForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            timeRegisterForm.Show();
+        }
+
+        private void employeeProfileToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!HasAccess("frmEmployeeProfile"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmEmployeeProfile employeeForm = new frmEmployeeProfile();
+            employeeForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            employeeForm.Show();
+        }
+
+        private void dailyAttendanceDataToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!HasAccess("frmImportData"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmImportData importForm = new frmImportData();
+            importForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            importForm.Show();
+        }
+
+        private void exportToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void monthlyAttendanceDataToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!HasAccess("frmExportAttendance"))
+            {
+                MessageBox.Show("You do not have permission to access this feature.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmExportAttendance exportForm = new frmExportAttendance();
+            exportForm.FormClosed += (s, args) => this.Show();
+            this.Hide();
+            exportForm.Show();
+        }
     }
 }

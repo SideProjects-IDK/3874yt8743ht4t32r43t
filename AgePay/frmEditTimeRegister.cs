@@ -367,7 +367,7 @@ namespace AgePay
             txtTimeIn = new TextBox
             {
                 Text = timeIn?.ToString(@"hh\:mm\:ss") ?? "",
-                Location = new Point(150, 300),
+                Location = new Point(190, 300),
                 Width = 200,
                 Font = new Font("Segoe UI", 9)
             };
@@ -383,7 +383,7 @@ namespace AgePay
             txtTimeOut = new TextBox
             {
                 Text = timeOut?.ToString(@"hh\:mm\:ss") ?? "",
-                Location = new Point(150, 330),
+                Location = new Point(190, 330),
                 Width = 200,
                 Font = new Font("Segoe UI", 9)
             };

@@ -6,7 +6,7 @@ namespace AgePay
 {
     public static class ConnectToSqlDatabase_MsSQL
     {
-        public static readonly string connectionString = "Server=192.168.1.198;Database=AgePay;User Id=sa;Password=ilahia;";
+        public static readonly string connectionString = "Server=192.168.1.197;Database=AgePay;User Id=sa;Password=ilahia;";
         private static SqlConnection connection;
 
         public static SqlConnection GetConnection()
