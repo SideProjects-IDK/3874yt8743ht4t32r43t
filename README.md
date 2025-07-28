@@ -1,47 +1,125 @@
 # AgePay
 
 # hello worlds!
+---
+---
 
 ## 🛠️ `7/28/2025` — Big Fix Day!
 
 ### 🔧 General Fixes
 - [x] Don't hide `Form1` when a subform loads.
+  - [x] Prevent accidental hiding
+  - [x] Maintain parent visibility
+  - [x] Adjust z-order for subforms
 - [x] Hide links to forms that the user isn't authorized to access.
+  - [x] Check user roles at runtime
+  - [x] Hide buttons dynamically
+  - [x] Prevent access even via URL/path hacks
 - [x] Add calendar popups to all date input fields across all forms.
+  - [x] Attach calendar to DOB fields
+  - [x] Integrate with joining date inputs
+  - [x] Use consistent date format across app
 - [x] Rebuild and update the `ManualAttendanceForms`.
+  - [x] Delete legacy code
+  - [x] Redesign UI layout
+  - [x] Integrate database hooks
 - [x] Ensure proper focus behavior on all forms.
+  - [x] Set default focus on load
+  - [x] Trap Tab key properly
+  - [x] Fix focus loss on dialog close
+
+---
 
 ### 👤 `EmployeeProfile` Enhancements
 - [x] Calendar integration complete.
+  - [x] Connect calendar to join/leave dates
+  - [x] Format values consistently
 - [x] Fixed image load/save/display errors.
+  - [x] Validate image types
+  - [x] Add error handling on load
+  - [x] Ensure compatibility across OS versions
 - [x] Improved open/save logic.
+  - [x] Add confirmation prompts
+  - [x] Prevent duplicate entries
 - [x] Miscellaneous bug fixes.
+  - [x] Label misalignments
+  - [x] Typos in field names
 - [x] Focus behavior fixed.
+  - [x] Auto-focus on first editable field
+  - [x] Refocus after save or cancel
+
+---
 
 ### ⏱️ `EditTime` Module
 - [x] Added calendar support.
+  - [x] Inline calendar for quick edits
+  - [x] Popup calendar for full date range
 - [x] Implemented edit tracking and validation.
+  - [x] Prevent future time entries
+  - [x] Validate overtime limits
 - [x] Fixed known errors.
+  - [x] Error on empty time field
+  - [x] Crash on edge cases
 - [x] Fixed focus handling.
+  - [x] Focus jumps to next field
+  - [x] Fixed Tab/Enter behavior
+
+---
 
 ### 🏖️ `EditHoliday` Form
 - [x] Calendar functionality added.
+  - [x] Show holiday picker
+  - [x] Disable past dates
 - [x] Focus flow improved.
+  - [x] Set tab order
+  - [x] Focus on holiday name by default
 - [x] Fixed database issues.
+  - [x] Corrected save logic
+  - [x] Fixed duplicate holiday bug
+
+---
 
 ### 🔐 `LoginForm` Updates
 - [x] Improved focus control.
+  - [x] Focus on username field
+  - [x] Move to password on Enter
 - [x] Added superadmin-specific logic.
+  - [x] Unlock hidden menus
+  - [x] Log superadmin sessions
 - [x] Enhanced Enter key behavior.
+  - [x] Submit form on Enter
+  - [x] Block empty field submission
+
+---
 
 ### 🧭 `MainPanel` Improvements
 - [x] Hide inaccessible buttons based on permissions.
+  - [x] Check user roles on login
+  - [x] Hide UI elements accordingly
 - [x] Prevent hiding of the main form.
+  - [x] Override close/hide events
+  - [x] Add confirmation before exit
 - [x] Updated permission logic.
+  - [x] Add granular control per feature
+  - [x] Audit permission checks
 - [x] Added permissions for Loan, Advance, and Salary sections.
+  - [x] Create new permission entries
+  - [x] Connect to access control system
+  - [x] Test with sample roles
+
+---
 
 ### 📆 `ManualAttendanceForms`
 - [x] Completely rebuilt the form from scratch for better performance and maintainability.
+  - [x] New UI layout with cleaner design
+  - [x] Integrated real-time validation
+  - [x] Connected to updated attendance DB
+  - [x] Added comments/notes section
+  - [x] Focus flow and keyboard shortcuts
+
+
+---
+---
 
 
 ## LOGIN
