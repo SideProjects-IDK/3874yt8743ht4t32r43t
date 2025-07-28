@@ -2,38 +2,46 @@
 
 # hello worlds!
 
-## `7/28/2025`
-- [X] Dont hide form1 when a subform loads!
-- [X] Dont show the link-to-forms who are not allowed to access by the user!
-- [x] Show calander on data inputs in every form!
-- [ ] Update the ManualAttendanceForms!
-- [x] Change focus on every form!
+## 🛠️ `7/28/2025` — Big Fix Day!
 
-- [X] EmployeProfile:
-  - [X] CLANDER STUFF
-  - [X] IMAGE ERRORS
-  - [X] OPEN/SAVE LOGIC
-  - [X] OTHERS
-  - [x] FOCUS
- - [X] EditTime
-   - [X] clanader stuff
-   - [x] edit changes
-   - [x] error fixes
-   - [x] focus 
- - [x] from edit holday
-   - [x] calander
-   - [x] focus
-   - [x] db issues fixed!
- - [x] from login
-   - [x] focus
-   - [x] superadmin
-   - [x] enter controls
- - [x] mainpanel
-   - [x] hide unacced buttons
-   - [x] dont hide main from
-   - [x] update permissions
-   - [x] add permissionsfor loan,advnnaced,salary         
- 
+### 🔧 General Fixes
+- [x] Don't hide `Form1` when a subform loads.
+- [x] Hide links to forms that the user isn't authorized to access.
+- [x] Add calendar popups to all date input fields across all forms.
+- [x] Rebuild and update the `ManualAttendanceForms`.
+- [x] Ensure proper focus behavior on all forms.
+
+### 👤 `EmployeeProfile` Enhancements
+- [x] Calendar integration complete.
+- [x] Fixed image load/save/display errors.
+- [x] Improved open/save logic.
+- [x] Miscellaneous bug fixes.
+- [x] Focus behavior fixed.
+
+### ⏱️ `EditTime` Module
+- [x] Added calendar support.
+- [x] Implemented edit tracking and validation.
+- [x] Fixed known errors.
+- [x] Fixed focus handling.
+
+### 🏖️ `EditHoliday` Form
+- [x] Calendar functionality added.
+- [x] Focus flow improved.
+- [x] Fixed database issues.
+
+### 🔐 `LoginForm` Updates
+- [x] Improved focus control.
+- [x] Added superadmin-specific logic.
+- [x] Enhanced Enter key behavior.
+
+### 🧭 `MainPanel` Improvements
+- [x] Hide inaccessible buttons based on permissions.
+- [x] Prevent hiding of the main form.
+- [x] Updated permission logic.
+- [x] Added permissions for Loan, Advance, and Salary sections.
+
+### 📆 `ManualAttendanceForms`
+- [x] Completely rebuilt the form from scratch for better performance and maintainability.
 
 
 ## LOGIN
