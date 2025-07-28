@@ -1,6 +1,22 @@
 # AgePay
 
 # hello worlds!
+
+update your user's permissions to:
+```shell
+["frmEmployeeProfile",
+            "frmEditDepo",
+            "frmEditHoliday",
+            "frmImportData",
+            "frmExportAttendance",
+            "frmEditTimeRegister",
+            "frmManualTimeRegister",
+            "frmAdvanceRegister",
+            "frmLoanRegister",
+            "frmSalaryRegister",
+            "frmLogin",
+            "frmEditUserPrivlidges"]
+```
 ---
 ---
 
