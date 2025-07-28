@@ -1,6 +1,14 @@
 # AgePay
 
-@ hello worlds!
+# hello worlds!
+
+## `7/28/2025`
+- [X] Dont hide form1 when a subform loads!
+- [X] Dont show the link-to-forms who are not allowed to access by the user!
+- [ ] Show calander on data inputs!
+- [ ] Update the ManualAttendanceForms!
+ 
+
 
 ## LOGIN
 <img width="919" height="793" alt="image" src="https://github.com/user-attachments/assets/860acbf5-6f5f-45b0-9e4b-305e6ff42d34" />
