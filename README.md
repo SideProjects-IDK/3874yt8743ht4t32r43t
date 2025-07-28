@@ -10,26 +10,26 @@
 - [x] Change focus on every form!
 
 - [X] EmployeProfile:
-- - [X] CLANDER STUFF
+  - [X] CLANDER STUFF
   - [X] IMAGE ERRORS
   - [X] OPEN/SAVE LOGIC
   - [X] OTHERS
   - [x] FOCUS
  - [X] EditTime
- - - [X] clanader stuff
+   - [X] clanader stuff
    - [x] edit changes
    - [x] error fixes
    - [x] focus 
  - [x] from edit holday
- - - [x] calander
- - - [x] focus
+   - [x] calander
+   - [x] focus
    - [x] db issues fixed!
  - [x] from login
- - - [x] focus
+   - [x] focus
    - [x] superadmin
    - [x] enter controls
  - [x] mainpanel
- - - [x] hide unacced buttons
+   - [x] hide unacced buttons
    - [x] dont hide main from
    - [x] update permissions
    - [x] add permissionsfor loan,advnnaced,salary         
