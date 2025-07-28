@@ -5,9 +5,9 @@
 ## `7/28/2025`
 - [X] Dont hide form1 when a subform loads!
 - [X] Dont show the link-to-forms who are not allowed to access by the user!
-- [ ] Show calander on data inputs in every form!
+- [x] Show calander on data inputs in every form!
 - [ ] Update the ManualAttendanceForms!
-- [ ] Change focus on every form!
+- [x] Change focus on every form!
  
 
 
